@@ -1,0 +1,26 @@
+[project]
+name = "launchpad-sampler"
+version = "1.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "PyQt6>=6.6",
+    "python-rtmidi>=1.5",
+    "sounddevice>=0.4",
+    "soundfile>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-qt>=4.4",
+]
+
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=68"]
+
+[tool.setuptools.packages.find]
+include = ["modelos*", "motor*", "ui*", "config*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

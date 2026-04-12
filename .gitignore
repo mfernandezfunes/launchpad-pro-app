@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+dist/
+build/
+*.spec.bak
+.DS_Store
+*.lpsampler
+*.egg-info/
