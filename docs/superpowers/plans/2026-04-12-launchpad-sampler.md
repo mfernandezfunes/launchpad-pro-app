@@ -14,17 +14,17 @@
 
 | Archivo | Responsabilidad |
 |---|---|
-| `main.py` | Punto de entrada, inicializa QApplication y VentanaPrincipal |
-| `modelos/proyecto.py` | Dataclasses: PadConfig, Banco, Ajustes, Proyecto |
-| `config/archivo_proyecto.py` | Serialización/deserialización JSON (.lpsampler) |
-| `motor/motor_audio.py` | Reproducción de audio con sounddevice (modos: única, bucle, alternar) |
-| `motor/motor_midi.py` | Conexión MIDI, recepción de note_on, envío de colores y parpadeo |
-| `ui/grid_pads.py` | Widget 8x8 grid de pads con colores y selección visual |
-| `ui/selector_bancos.py` | Tabs A-H para seleccionar banco activo |
-| `ui/panel_config_pad.py` | Panel derecho: paleta de colores + selector de audio (y panel de ajustes) |
-| `ui/dialogo_config_pad.py` | Diálogo de asignación de audio + color (para Modo Asignación) |
-| `ui/dialogo_acerca_de.py` | Diálogo "Acerca de" con info de app y developer |
-| `ui/ventana_principal.py` | Ventana principal: orquesta todos los widgets, Modo Asignación, menú |
+| `main.py` | Punto de entrada, inicializa QApplication y MainWindow |
+| `models/project.py` | Dataclasses: PadConfig, Bank, Settings, Project |
+| `config/project_file.py` | Serialización/deserialización JSON (.lpsampler) |
+| `engine/audio_engine.py` | Reproducción de audio con sounddevice (modos: oneshot, loop, toggle) |
+| `engine/midi_engine.py` | Conexión MIDI, recepción de note_on, envío de colores y parpadeo |
+| `ui/pad_grid.py` | Widget 8x8 grid de pads con colores y selección visual |
+| `ui/bank_selector.py` | Tabs A-H para seleccionar banco activo |
+| `ui/pad_config_panel.py` | Panel derecho: paleta de colores + selector de audio (y panel de ajustes) |
+| `ui/pad_config_dialog.py` | Diálogo de asignación de audio + color (para Modo Asignación) |
+| `ui/about_dialog.py` | Diálogo "Acerca de" con info de app y developer |
+| `ui/main_window.py` | Ventana principal: orquesta todos los widgets, Modo Asignación, menú |
 | `tests/conftest.py` | Fixtures de pytest: QApplication, proyecto de prueba |
 | `launchpad-sampler.spec` | Configuración de PyInstaller |
 
@@ -53,7 +53,7 @@ Colores:
 - Crear: `pyproject.toml`
 - Crear: `.gitignore`
 - Crear: `README.md`
-- Crear: `modelos/__init__.py`, `motor/__init__.py`, `ui/__init__.py`, `config/__init__.py`, `tests/__init__.py`
+- Crear: `models/__init__.py`, `engine/__init__.py`, `ui/__init__.py`, `config/__init__.py`, `tests/__init__.py`
 
 - [ ] **Paso 1: Inicializar git y estructura de directorios**
 
@@ -61,8 +61,8 @@ Colores:
 cd /Users/martin.fernandez/Documents/repos_personal/launchpad-pro-app
 git init
 git remote add origin git@github.com:mfernandezfunes/launchpad-pro-app.git
-mkdir -p modelos motor ui config tests
-touch modelos/__init__.py motor/__init__.py ui/__init__.py config/__init__.py tests/__init__.py
+mkdir -p models engine ui config tests
+touch models/__init__.py engine/__init__.py ui/__init__.py config/__init__.py tests/__init__.py
 ```
 
 - [ ] **Paso 2: Crear pyproject.toml**
@@ -145,7 +145,7 @@ Verificar: `python -c "import PyQt6; import rtmidi; import sounddevice; import s
 - [ ] **Paso 6: Commit inicial**
 
 ```bash
-git add pyproject.toml .gitignore README.md modelos/ motor/ ui/ config/ tests/
+git add pyproject.toml .gitignore README.md models/ engine/ ui/ config/ tests/
 git commit -S -m "chore: setup inicial del proyecto"
 ```
 
@@ -154,66 +154,66 @@ git commit -S -m "chore: setup inicial del proyecto"
 ## Tarea 2: Modelos de datos
 
 **Archivos:**
-- Crear: `modelos/proyecto.py`
-- Crear: `tests/test_modelos.py`
+- Crear: `models/project.py`
+- Crear: `tests/test_models.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_modelos.py`:
+Crear `tests/test_models.py`:
 
 ```python
-from modelos.proyecto import PadConfig, Banco, Ajustes, Proyecto
+from models.project import PadConfig, Bank, Settings, Project
 
 
 def test_pad_config_defaults():
-    pad = PadConfig(audio_file="/ruta/kick.wav", color=3)
-    assert pad.audio_file == "/ruta/kick.wav"
+    pad = PadConfig(audio_file="/path/kick.wav", color=3)
+    assert pad.audio_file == "/path/kick.wav"
     assert pad.color == 3
 
 
-def test_banco_pads_vacio():
-    banco = Banco(nombre="A")
-    assert banco.pads == {}
+def test_bank_empty_pads():
+    bank = Bank(name="A")
+    assert bank.pads == {}
 
 
-def test_banco_agregar_pad():
-    banco = Banco(nombre="A")
-    banco.pads[11] = PadConfig(audio_file="/ruta/snare.wav", color=5)
-    assert 11 in banco.pads
-    assert banco.pads[11].color == 5
+def test_bank_add_pad():
+    bank = Bank(name="A")
+    bank.pads[11] = PadConfig(audio_file="/path/snare.wav", color=5)
+    assert 11 in bank.pads
+    assert bank.pads[11].color == 5
 
 
-def test_proyecto_bancos_iniciales():
-    proyecto = Proyecto.nuevo()
-    assert len(proyecto.bancos) == 1
-    assert proyecto.bancos[0].nombre == "A"
+def test_project_initial_banks():
+    project = Project.new()
+    assert len(project.banks) == 1
+    assert project.banks[0].name == "A"
 
 
-def test_proyecto_banco_activo():
-    proyecto = Proyecto.nuevo()
-    assert proyecto.banco_activo_indice == 0
+def test_project_active_bank():
+    project = Project.new()
+    assert project.active_bank_index == 0
 
 
-def test_ajustes_modo_reproduccion():
-    ajustes = Ajustes(
-        midi_entrada="",
-        midi_salida="",
-        audio_salida="",
-        volumen=0.8,
-        modo_reproduccion="unica",
+def test_settings_play_mode():
+    settings = Settings(
+        midi_input="",
+        midi_output="",
+        audio_output="",
+        volume=0.8,
+        play_mode="oneshot",
     )
-    assert ajustes.modo_reproduccion == "unica"
+    assert settings.play_mode == "oneshot"
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_modelos.py -v
+pytest tests/test_models.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'modelos.proyecto'`
+Esperado: `ModuleNotFoundError: No module named 'models.project'`
 
-- [ ] **Paso 3: Implementar modelos/proyecto.py**
+- [ ] **Paso 3: Implementar models/project.py**
 
 ```python
 from __future__ import annotations
@@ -227,48 +227,48 @@ class PadConfig:
 
 
 @dataclass
-class Banco:
-    nombre: str
+class Bank:
+    name: str
     pads: dict[int, PadConfig] = field(default_factory=dict)
 
 
 @dataclass
-class Ajustes:
-    midi_entrada: str
-    midi_salida: str
-    audio_salida: str
-    volumen: float  # 0.0-1.0
-    modo_reproduccion: str  # "unica" | "bucle" | "alternar"
+class Settings:
+    midi_input: str
+    midi_output: str
+    audio_output: str
+    volume: float  # 0.0-1.0
+    play_mode: str  # "oneshot" | "loop" | "toggle"
 
 
 @dataclass
-class Proyecto:
-    bancos: list[Banco]
-    ajustes: Ajustes
-    banco_activo_indice: int = 0
+class Project:
+    banks: list[Bank]
+    settings: Settings
+    active_bank_index: int = 0
 
     @classmethod
-    def nuevo(cls) -> Proyecto:
+    def new(cls) -> Project:
         return cls(
-            bancos=[Banco(nombre="A")],
-            ajustes=Ajustes(
-                midi_entrada="",
-                midi_salida="",
-                audio_salida="",
-                volumen=0.8,
-                modo_reproduccion="unica",
+            banks=[Bank(name="A")],
+            settings=Settings(
+                midi_input="",
+                midi_output="",
+                audio_output="",
+                volume=0.8,
+                play_mode="oneshot",
             ),
         )
 
     @property
-    def banco_activo(self) -> Banco:
-        return self.bancos[self.banco_activo_indice]
+    def active_bank(self) -> Bank:
+        return self.banks[self.active_bank_index]
 ```
 
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_modelos.py -v
+pytest tests/test_models.py -v
 ```
 
 Esperado: 6 tests PASSED
@@ -276,8 +276,8 @@ Esperado: 6 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add modelos/proyecto.py tests/test_modelos.py
-git commit -S -m "feat: modelos de datos (PadConfig, Banco, Ajustes, Proyecto)"
+git add models/project.py tests/test_models.py
+git commit -S -m "feat: data models (PadConfig, Bank, Settings, Project)"
 ```
 
 ---
@@ -285,142 +285,142 @@ git commit -S -m "feat: modelos de datos (PadConfig, Banco, Ajustes, Proyecto)"
 ## Tarea 3: Serialización del proyecto (JSON)
 
 **Archivos:**
-- Crear: `config/archivo_proyecto.py`
-- Crear: `tests/test_archivo_proyecto.py`
+- Crear: `config/project_file.py`
+- Crear: `tests/test_project_file.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_archivo_proyecto.py`:
+Crear `tests/test_project_file.py`:
 
 ```python
 import json
 import pytest
 from pathlib import Path
-from modelos.proyecto import PadConfig, Banco, Ajustes, Proyecto
-from config.archivo_proyecto import guardar_proyecto, cargar_proyecto
+from models.project import PadConfig, Bank, Settings, Project
+from config.project_file import save_project, load_project
 
 
 @pytest.fixture
-def proyecto_con_pads():
-    p = Proyecto.nuevo()
-    p.bancos[0].pads[11] = PadConfig(audio_file="/audio/kick.wav", color=3)
-    p.bancos[0].pads[12] = PadConfig(audio_file="/audio/snare.wav", color=5)
+def project_with_pads():
+    p = Project.new()
+    p.banks[0].pads[11] = PadConfig(audio_file="/audio/kick.wav", color=3)
+    p.banks[0].pads[12] = PadConfig(audio_file="/audio/snare.wav", color=5)
     return p
 
 
-def test_guardar_y_cargar_roundtrip(tmp_path, proyecto_con_pads):
-    ruta = tmp_path / "test.lpsampler"
-    guardar_proyecto(proyecto_con_pads, ruta)
-    cargado = cargar_proyecto(ruta)
-    assert cargado.bancos[0].nombre == "A"
-    assert cargado.bancos[0].pads[11].audio_file == "/audio/kick.wav"
-    assert cargado.bancos[0].pads[11].color == 3
-    assert cargado.ajustes.volumen == pytest.approx(0.8)
-    assert cargado.ajustes.modo_reproduccion == "unica"
+def test_save_and_load_roundtrip(tmp_path, project_with_pads):
+    path = tmp_path / "test.lpsampler"
+    save_project(project_with_pads, path)
+    loaded = load_project(path)
+    assert loaded.banks[0].name == "A"
+    assert loaded.banks[0].pads[11].audio_file == "/audio/kick.wav"
+    assert loaded.banks[0].pads[11].color == 3
+    assert loaded.settings.volume == pytest.approx(0.8)
+    assert loaded.settings.play_mode == "oneshot"
 
 
-def test_archivo_es_json_valido(tmp_path, proyecto_con_pads):
-    ruta = tmp_path / "test.lpsampler"
-    guardar_proyecto(proyecto_con_pads, ruta)
-    contenido = json.loads(ruta.read_text())
-    assert "bancos" in contenido
-    assert "ajustes" in contenido
+def test_file_is_valid_json(tmp_path, project_with_pads):
+    path = tmp_path / "test.lpsampler"
+    save_project(project_with_pads, path)
+    content = json.loads(path.read_text())
+    assert "banks" in content
+    assert "settings" in content
 
 
-def test_cargar_archivo_inexistente_lanza_error(tmp_path):
+def test_load_missing_file_raises_error(tmp_path):
     with pytest.raises(FileNotFoundError):
-        cargar_proyecto(tmp_path / "inexistente.lpsampler")
+        load_project(tmp_path / "missing.lpsampler")
 
 
-def test_multiples_bancos_roundtrip(tmp_path):
-    p = Proyecto.nuevo()
-    p.bancos.append(Banco(nombre="B"))
-    p.bancos[1].pads[21] = PadConfig(audio_file="/audio/hihat.wav", color=9)
-    ruta = tmp_path / "test.lpsampler"
-    guardar_proyecto(p, ruta)
-    cargado = cargar_proyecto(ruta)
-    assert len(cargado.bancos) == 2
-    assert cargado.bancos[1].pads[21].audio_file == "/audio/hihat.wav"
+def test_multiple_banks_roundtrip(tmp_path):
+    p = Project.new()
+    p.banks.append(Bank(name="B"))
+    p.banks[1].pads[21] = PadConfig(audio_file="/audio/hihat.wav", color=9)
+    path = tmp_path / "test.lpsampler"
+    save_project(p, path)
+    loaded = load_project(path)
+    assert len(loaded.banks) == 2
+    assert loaded.banks[1].pads[21].audio_file == "/audio/hihat.wav"
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_archivo_proyecto.py -v
+pytest tests/test_project_file.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'config.archivo_proyecto'`
+Esperado: `ModuleNotFoundError: No module named 'config.project_file'`
 
-- [ ] **Paso 3: Implementar config/archivo_proyecto.py**
+- [ ] **Paso 3: Implementar config/project_file.py**
 
 ```python
 from __future__ import annotations
 import json
 from pathlib import Path
-from modelos.proyecto import PadConfig, Banco, Ajustes, Proyecto
+from models.project import PadConfig, Bank, Settings, Project
 
 
-def guardar_proyecto(proyecto: Proyecto, ruta: Path) -> None:
-    datos = {
-        "banco_activo_indice": proyecto.banco_activo_indice,
-        "bancos": [
+def save_project(project: Project, path: Path) -> None:
+    data = {
+        "active_bank_index": project.active_bank_index,
+        "banks": [
             {
-                "nombre": banco.nombre,
+                "name": bank.name,
                 "pads": {
-                    str(nota): {"audio_file": pad.audio_file, "color": pad.color}
-                    for nota, pad in banco.pads.items()
+                    str(note): {"audio_file": pad.audio_file, "color": pad.color}
+                    for note, pad in bank.pads.items()
                 },
             }
-            for banco in proyecto.bancos
+            for bank in project.banks
         ],
-        "ajustes": {
-            "midi_entrada": proyecto.ajustes.midi_entrada,
-            "midi_salida": proyecto.ajustes.midi_salida,
-            "audio_salida": proyecto.ajustes.audio_salida,
-            "volumen": proyecto.ajustes.volumen,
-            "modo_reproduccion": proyecto.ajustes.modo_reproduccion,
+        "settings": {
+            "midi_input": project.settings.midi_input,
+            "midi_output": project.settings.midi_output,
+            "audio_output": project.settings.audio_output,
+            "volume": project.settings.volume,
+            "play_mode": project.settings.play_mode,
         },
     }
-    Path(ruta).write_text(json.dumps(datos, indent=2, ensure_ascii=False))
+    Path(path).write_text(json.dumps(data, indent=2, ensure_ascii=False))
 
 
-def cargar_proyecto(ruta: Path) -> Proyecto:
-    ruta = Path(ruta)
-    if not ruta.exists():
-        raise FileNotFoundError(f"Archivo no encontrado: {ruta}")
-    datos = json.loads(ruta.read_text())
-    bancos = [
-        Banco(
-            nombre=b["nombre"],
+def load_project(path: Path) -> Project:
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Archivo no encontrado: {path}")
+    data = json.loads(path.read_text())
+    banks = [
+        Bank(
+            name=b["name"],
             pads={
-                int(nota): PadConfig(
+                int(note): PadConfig(
                     audio_file=pad["audio_file"],
                     color=pad["color"],
                 )
-                for nota, pad in b["pads"].items()
+                for note, pad in b["pads"].items()
             },
         )
-        for b in datos["bancos"]
+        for b in data["banks"]
     ]
-    a = datos["ajustes"]
-    ajustes = Ajustes(
-        midi_entrada=a["midi_entrada"],
-        midi_salida=a["midi_salida"],
-        audio_salida=a["audio_salida"],
-        volumen=a["volumen"],
-        modo_reproduccion=a["modo_reproduccion"],
+    a = data["settings"]
+    settings = Settings(
+        midi_input=a["midi_input"],
+        midi_output=a["midi_output"],
+        audio_output=a["audio_output"],
+        volume=a["volume"],
+        play_mode=a["play_mode"],
     )
-    return Proyecto(
-        bancos=bancos,
-        ajustes=ajustes,
-        banco_activo_indice=datos.get("banco_activo_indice", 0),
+    return Project(
+        banks=banks,
+        settings=settings,
+        active_bank_index=data.get("active_bank_index", 0),
     )
 ```
 
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_archivo_proyecto.py -v
+pytest tests/test_project_file.py -v
 ```
 
 Esperado: 4 tests PASSED
@@ -428,8 +428,8 @@ Esperado: 4 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add config/archivo_proyecto.py tests/test_archivo_proyecto.py
-git commit -S -m "feat: serialización de proyecto a JSON (.lpsampler)"
+git add config/project_file.py tests/test_project_file.py
+git commit -S -m "feat: project serialization to JSON (.lpsampler)"
 ```
 
 ---
@@ -437,69 +437,69 @@ git commit -S -m "feat: serialización de proyecto a JSON (.lpsampler)"
 ## Tarea 4: Motor de audio
 
 **Archivos:**
-- Crear: `motor/motor_audio.py`
-- Crear: `tests/test_motor_audio.py`
+- Crear: `engine/audio_engine.py`
+- Crear: `tests/test_audio_engine.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_motor_audio.py`:
+Crear `tests/test_audio_engine.py`:
 
 ```python
 import pytest
 from unittest.mock import patch, MagicMock
-from motor.motor_audio import MotorAudio
+from engine.audio_engine import AudioEngine
 
 
 @pytest.fixture
-def motor():
-    with patch("motor.motor_audio.sd") as mock_sd, \
-         patch("motor.motor_audio.sf") as mock_sf:
+def engine():
+    with patch("engine.audio_engine.sd") as mock_sd, \
+         patch("engine.audio_engine.sf") as mock_sf:
         mock_sf.read.return_value = ([0.0, 0.1, 0.2], 44100)
-        yield MotorAudio(), mock_sd, mock_sf
+        yield AudioEngine(), mock_sd, mock_sf
 
 
-def test_reproducir_unica_llama_play(motor):
-    m, mock_sd, mock_sf = motor
-    m.reproducir("/audio/kick.wav", volumen=0.8, modo="unica", pad_id=11,
-                 al_terminar=None)
+def test_play_oneshot_calls_play(engine):
+    m, mock_sd, mock_sf = engine
+    m.play("/audio/kick.wav", volume=0.8, mode="oneshot", pad_id=11,
+           on_complete=None)
     mock_sd.play.assert_called_once()
 
 
-def test_reproducir_ajusta_volumen(motor):
-    m, mock_sd, mock_sf = motor
-    m.reproducir("/audio/kick.wav", volumen=0.5, modo="unica", pad_id=11,
-                 al_terminar=None)
+def test_play_adjusts_volume(engine):
+    m, mock_sd, mock_sf = engine
+    m.play("/audio/kick.wav", volume=0.5, mode="oneshot", pad_id=11,
+           on_complete=None)
     args, kwargs = mock_sd.play.call_args
-    # el primer argumento es el array de audio * volumen
+    # el primer argumento es el array de audio * volume
     import numpy as np
     assert args[0].max() <= 0.5 * 1.1  # tolerancia
 
 
-def test_detener_pad(motor):
-    m, mock_sd, _ = motor
-    m.reproducir("/audio/kick.wav", volumen=1.0, modo="bucle", pad_id=11,
-                 al_terminar=None)
-    m.detener(pad_id=11)
+def test_stop_pad(engine):
+    m, mock_sd, _ = engine
+    m.play("/audio/kick.wav", volume=1.0, mode="loop", pad_id=11,
+           on_complete=None)
+    m.stop(pad_id=11)
     mock_sd.stop.assert_called()
 
 
-def test_reproducir_archivo_inexistente_no_lanza(motor):
-    m, mock_sd, mock_sf = motor
+def test_play_missing_file_does_not_raise(engine):
+    m, mock_sd, mock_sf = engine
     mock_sf.read.side_effect = FileNotFoundError
     # No debe propagar la excepción
-    m.reproducir("/no/existe.wav", volumen=1.0, modo="unica", pad_id=99,
-                 al_terminar=None)
+    m.play("/no/existe.wav", volume=1.0, mode="oneshot", pad_id=99,
+           on_complete=None)
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_motor_audio.py -v
+pytest tests/test_audio_engine.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'motor.motor_audio'`
+Esperado: `ModuleNotFoundError: No module named 'engine.audio_engine'`
 
-- [ ] **Paso 3: Implementar motor/motor_audio.py**
+- [ ] **Paso 3: Implementar engine/audio_engine.py**
 
 ```python
 from __future__ import annotations
@@ -514,86 +514,86 @@ import soundfile as sf
 logger = logging.getLogger(__name__)
 
 
-class MotorAudio:
+class AudioEngine:
     def __init__(self) -> None:
-        self._activos: dict[int, threading.Thread] = {}
-        self._detener_flags: dict[int, threading.Event] = {}
+        self._active: dict[int, threading.Thread] = {}
+        self._stop_flags: dict[int, threading.Event] = {}
 
-    def reproducir(
+    def play(
         self,
         audio_file: str,
-        volumen: float,
-        modo: str,
+        volume: float,
+        mode: str,
         pad_id: int,
-        al_terminar: Optional[Callable[[int], None]],
-        dispositivo: Optional[str] = None,
+        on_complete: Optional[Callable[[int], None]],
+        device: Optional[str] = None,
     ) -> None:
-        """Reproduce audio para un pad. modo: 'unica' | 'bucle' | 'alternar'"""
-        if modo == "alternar" and pad_id in self._activos:
-            self.detener(pad_id)
+        """Reproduce audio para un pad. mode: 'oneshot' | 'loop' | 'toggle'"""
+        if mode == "toggle" and pad_id in self._active:
+            self.stop(pad_id)
             return
 
-        self.detener(pad_id)
+        self.stop(pad_id)
         flag = threading.Event()
-        self._detener_flags[pad_id] = flag
+        self._stop_flags[pad_id] = flag
 
-        hilo = threading.Thread(
-            target=self._reproducir_hilo,
-            args=(audio_file, volumen, modo, pad_id, flag, al_terminar, dispositivo),
+        thread = threading.Thread(
+            target=self._play_thread,
+            args=(audio_file, volume, mode, pad_id, flag, on_complete, device),
             daemon=True,
         )
-        self._activos[pad_id] = hilo
-        hilo.start()
+        self._active[pad_id] = thread
+        thread.start()
 
-    def _reproducir_hilo(
+    def _play_thread(
         self,
         audio_file: str,
-        volumen: float,
-        modo: str,
+        volume: float,
+        mode: str,
         pad_id: int,
         flag: threading.Event,
-        al_terminar: Optional[Callable[[int], None]],
-        dispositivo: Optional[str],
+        on_complete: Optional[Callable[[int], None]],
+        device: Optional[str],
     ) -> None:
         try:
-            datos, samplerate = sf.read(audio_file, dtype="float32")
-            datos = datos * volumen
+            data, samplerate = sf.read(audio_file, dtype="float32")
+            data = data * volume
             kwargs: dict = {"samplerate": samplerate}
-            if dispositivo:
-                kwargs["device"] = dispositivo
+            if device:
+                kwargs["device"] = device
             while not flag.is_set():
-                sd.play(datos, **kwargs)
+                sd.play(data, **kwargs)
                 sd.wait()
-                if modo != "bucle" or flag.is_set():
+                if mode != "loop" or flag.is_set():
                     break
         except FileNotFoundError:
             logger.warning("Archivo de audio no encontrado: %s", audio_file)
         except Exception as e:
             logger.error("Error reproduciendo %s: %s", audio_file, e)
         finally:
-            self._activos.pop(pad_id, None)
-            self._detener_flags.pop(pad_id, None)
-            if al_terminar:
-                al_terminar(pad_id)
+            self._active.pop(pad_id, None)
+            self._stop_flags.pop(pad_id, None)
+            if on_complete:
+                on_complete(pad_id)
 
-    def detener(self, pad_id: int) -> None:
-        flag = self._detener_flags.get(pad_id)
+    def stop(self, pad_id: int) -> None:
+        flag = self._stop_flags.get(pad_id)
         if flag:
             flag.set()
             sd.stop()
 
-    def detener_todo(self) -> None:
-        for pad_id in list(self._detener_flags):
-            self.detener(pad_id)
+    def stop_all(self) -> None:
+        for pad_id in list(self._stop_flags):
+            self.stop(pad_id)
 
-    def esta_reproduciendo(self, pad_id: int) -> bool:
-        return pad_id in self._activos
+    def is_playing(self, pad_id: int) -> bool:
+        return pad_id in self._active
 ```
 
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_motor_audio.py -v
+pytest tests/test_audio_engine.py -v
 ```
 
 Esperado: 4 tests PASSED
@@ -601,8 +601,8 @@ Esperado: 4 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add motor/motor_audio.py tests/test_motor_audio.py
-git commit -S -m "feat: motor de audio con modos única, bucle y alternar"
+git add engine/audio_engine.py tests/test_audio_engine.py
+git commit -S -m "feat: audio engine with oneshot, loop and toggle modes"
 ```
 
 ---
@@ -610,87 +610,87 @@ git commit -S -m "feat: motor de audio con modos única, bucle y alternar"
 ## Tarea 5: Motor MIDI
 
 **Archivos:**
-- Crear: `motor/motor_midi.py`
-- Crear: `tests/test_motor_midi.py`
+- Crear: `engine/midi_engine.py`
+- Crear: `tests/test_midi_engine.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_motor_midi.py`:
+Crear `tests/test_midi_engine.py`:
 
 ```python
 import pytest
 from unittest.mock import patch, MagicMock, call
-from motor.motor_midi import MotorMidi, pad_a_nota, nota_a_pad, NOTAS_ESCENA
+from engine.midi_engine import MidiEngine, pad_to_note, note_to_pad, SCENE_NOTES
 
 
-def test_pad_a_nota_esquina_superior_izquierda():
+def test_pad_to_note_top_left_corner():
     # Fila visual 0 (arriba), col 0 → nota MIDI 81
-    assert pad_a_nota(0, 0) == 81
+    assert pad_to_note(0, 0) == 81
 
 
-def test_pad_a_nota_esquina_inferior_derecha():
+def test_pad_to_note_bottom_right_corner():
     # Fila visual 7 (abajo), col 7 → nota MIDI 18
-    assert pad_a_nota(7, 7) == 18
+    assert pad_to_note(7, 7) == 18
 
 
-def test_nota_a_pad_roundtrip():
-    for fila in range(8):
+def test_note_to_pad_roundtrip():
+    for row in range(8):
         for col in range(8):
-            nota = pad_a_nota(fila, col)
-            f2, c2 = nota_a_pad(nota)
-            assert (f2, c2) == (fila, col)
+            note = pad_to_note(row, col)
+            r2, c2 = note_to_pad(note)
+            assert (r2, c2) == (row, col)
 
 
-def test_notas_escena_son_8():
-    assert len(NOTAS_ESCENA) == 8
+def test_scene_notes_are_8():
+    assert len(SCENE_NOTES) == 8
 
 
-def test_listar_dispositivos_llama_rtmidi():
-    with patch("motor.motor_midi.rtmidi.MidiIn") as mock_in:
+def test_list_midi_devices_calls_rtmidi():
+    with patch("engine.midi_engine.rtmidi.MidiIn") as mock_in:
         mock_in.return_value.get_ports.return_value = ["Launchpad Mini", "otro"]
-        from motor.motor_midi import listar_dispositivos_midi
-        dispositivos = listar_dispositivos_midi()
-        assert "Launchpad Mini" in dispositivos
+        from engine.midi_engine import list_midi_devices
+        devices = list_midi_devices()
+        assert "Launchpad Mini" in devices
 
 
-def test_conectar_detecta_launchpad():
-    motor = MotorMidi()
-    with patch.object(motor, "_midi_in") as mock_in, \
-         patch.object(motor, "_midi_out") as mock_out:
+def test_connect_detects_launchpad():
+    engine = MidiEngine()
+    with patch.object(engine, "_midi_in") as mock_in, \
+         patch.object(engine, "_midi_out") as mock_out:
         mock_in.get_ports.return_value = ["Launchpad Mini MK2", "otro"]
         mock_out.get_ports.return_value = ["Launchpad Mini MK2", "otro"]
-        resultado = motor.conectar()
-        assert resultado is True
+        result = engine.connect()
+        assert result is True
 
 
-def test_set_color_pad_envia_note_on():
-    motor = MotorMidi()
+def test_set_pad_color_sends_note_on():
+    engine = MidiEngine()
     mock_out = MagicMock()
-    motor._midi_out = mock_out
-    motor._conectado = True
-    motor.set_color_pad(pad_id=11, color=3)
+    engine._midi_out = mock_out
+    engine._connected = True
+    engine.set_pad_color(pad_id=11, color=3)
     # note_on ch1 (0x90), nota 11, velocity 3
     mock_out.send_message.assert_called_with([0x90, 11, 3])
 
 
-def test_set_color_pad_apaga_con_0():
-    motor = MotorMidi()
+def test_set_pad_color_turns_off_with_0():
+    engine = MidiEngine()
     mock_out = MagicMock()
-    motor._midi_out = mock_out
-    motor._conectado = True
-    motor.set_color_pad(pad_id=11, color=0)
+    engine._midi_out = mock_out
+    engine._connected = True
+    engine.set_pad_color(pad_id=11, color=0)
     mock_out.send_message.assert_called_with([0x90, 11, 0])
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_motor_midi.py -v
+pytest tests/test_midi_engine.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'motor.motor_midi'`
+Esperado: `ModuleNotFoundError: No module named 'engine.midi_engine'`
 
-- [ ] **Paso 3: Implementar motor/motor_midi.py**
+- [ ] **Paso 3: Implementar engine/midi_engine.py**
 
 ```python
 from __future__ import annotations
@@ -704,46 +704,46 @@ import rtmidi
 logger = logging.getLogger(__name__)
 
 # Notas de escena: CC 104-111 (fila superior del LP Mini MK2)
-NOTAS_ESCENA = list(range(104, 112))
+SCENE_NOTES = list(range(104, 112))
 
 
-def pad_a_nota(fila: int, col: int) -> int:
-    """Convierte posición visual del grid (fila 0=arriba) a nota MIDI."""
-    fila_midi = 8 - fila  # fila visual 0 → fila MIDI 8 (notas 81-88)
-    return fila_midi * 10 + (col + 1)
+def pad_to_note(row: int, col: int) -> int:
+    """Convierte posición visual del grid (row 0=arriba) a nota MIDI."""
+    midi_row = 8 - row  # fila visual 0 → fila MIDI 8 (notas 81-88)
+    return midi_row * 10 + (col + 1)
 
 
-def nota_a_pad(nota: int) -> tuple[int, int]:
-    """Convierte nota MIDI a posición visual del grid (fila 0=arriba)."""
-    fila_midi = nota // 10
-    col = (nota % 10) - 1
-    fila = 8 - fila_midi
-    return fila, col
+def note_to_pad(note: int) -> tuple[int, int]:
+    """Convierte nota MIDI a posición visual del grid (row 0=arriba)."""
+    midi_row = note // 10
+    col = (note % 10) - 1
+    row = 8 - midi_row
+    return row, col
 
 
-def listar_dispositivos_midi() -> list[str]:
+def list_midi_devices() -> list[str]:
     midi_in = rtmidi.MidiIn()
     return midi_in.get_ports()
 
 
-class MotorMidi:
+class MidiEngine:
     def __init__(self) -> None:
         self._midi_in = rtmidi.MidiIn()
         self._midi_out = rtmidi.MidiOut()
-        self._conectado = False
+        self._connected = False
         self._callback_pad: Optional[Callable[[int], None]] = None
-        self._callback_escena: Optional[Callable[[int], None]] = None
-        self._parpadeos: dict[int, threading.Event] = {}
+        self._callback_scene: Optional[Callable[[int], None]] = None
+        self._blinks: dict[int, threading.Event] = {}
 
-    def conectar(self, nombre_dispositivo: str = "Launchpad") -> bool:
-        puertos_in = self._midi_in.get_ports()
-        puertos_out = self._midi_out.get_ports()
+    def connect(self, device_name: str = "Launchpad") -> bool:
+        ports_in = self._midi_in.get_ports()
+        ports_out = self._midi_out.get_ports()
         idx_in = next(
-            (i for i, p in enumerate(puertos_in) if nombre_dispositivo.lower() in p.lower()),
+            (i for i, p in enumerate(ports_in) if device_name.lower() in p.lower()),
             None,
         )
         idx_out = next(
-            (i for i, p in enumerate(puertos_out) if nombre_dispositivo.lower() in p.lower()),
+            (i for i, p in enumerate(ports_out) if device_name.lower() in p.lower()),
             None,
         )
         if idx_in is None or idx_out is None:
@@ -751,113 +751,113 @@ class MotorMidi:
             return False
         self._midi_in.open_port(idx_in)
         self._midi_out.open_port(idx_out)
-        self._midi_in.set_callback(self._on_mensaje)
-        self._conectado = True
-        logger.info("Launchpad conectado: %s", puertos_in[idx_in])
+        self._midi_in.set_callback(self._on_message)
+        self._connected = True
+        logger.info("Launchpad conectado: %s", ports_in[idx_in])
         return True
 
-    def desconectar(self) -> None:
-        self.detener_todos_parpadeos()
+    def disconnect(self) -> None:
+        self.stop_all_blinks()
         if self._midi_in.is_port_open():
             self._midi_in.close_port()
         if self._midi_out.is_port_open():
             self._midi_out.close_port()
-        self._conectado = False
+        self._connected = False
 
     def set_callback_pad(self, callback: Callable[[int], None]) -> None:
         """callback(pad_id: int) llamado al presionar un pad del grid."""
         self._callback_pad = callback
 
-    def set_callback_escena(self, callback: Callable[[int], None]) -> None:
-        """callback(indice_banco: int) llamado al presionar botón de escena."""
-        self._callback_escena = callback
+    def set_callback_scene(self, callback: Callable[[int], None]) -> None:
+        """callback(bank_index: int) llamado al presionar botón de escena."""
+        self._callback_scene = callback
 
-    def set_color_pad(self, pad_id: int, color: int) -> None:
+    def set_pad_color(self, pad_id: int, color: int) -> None:
         """Envía color estático a un pad. color=0 apaga."""
-        if not self._conectado:
+        if not self._connected:
             return
         self._midi_out.send_message([0x90, pad_id, color])
 
-    def iniciar_parpadeo(self, pad_id: int, color: int) -> None:
+    def start_blink(self, pad_id: int, color: int) -> None:
         """Hace parpadear un pad usando canal 2 (0x91) del LP Mini MK2."""
-        if not self._conectado:
+        if not self._connected:
             return
-        self.detener_parpadeo(pad_id)
+        self.stop_blink(pad_id)
         self._midi_out.send_message([0x91, pad_id, color])
 
-    def detener_parpadeo(self, pad_id: int, color: int = 0) -> None:
+    def stop_blink(self, pad_id: int, color: int = 0) -> None:
         """Detiene el parpadeo y restaura color estático."""
-        if not self._conectado:
+        if not self._connected:
             return
         self._midi_out.send_message([0x90, pad_id, color])
 
-    def detener_todos_parpadeos(self) -> None:
-        for flag in self._parpadeos.values():
+    def stop_all_blinks(self) -> None:
+        for flag in self._blinks.values():
             flag.set()
-        self._parpadeos.clear()
+        self._blinks.clear()
 
-    def set_color_escena(self, indice_banco: int, color: int) -> None:
+    def set_scene_color(self, bank_index: int, color: int) -> None:
         """Envía color a un botón de escena (CC 104-111)."""
-        if not self._conectado:
+        if not self._connected:
             return
-        cc = 104 + indice_banco
+        cc = 104 + bank_index
         self._midi_out.send_message([0xB0, cc, color])
 
-    def actualizar_leds_banco(self, banco, indice_banco_activo: int, todos_bancos: list) -> None:
+    def update_bank_leds(self, bank, active_bank_index: int, all_banks: list) -> None:
         """Actualiza todos los LEDs del LP para el banco dado."""
         # Apagar todos los pads del grid
-        for fila in range(8):
+        for row in range(8):
             for col in range(8):
-                nota = pad_a_nota(fila, col)
-                self.set_color_pad(nota, 0)
+                note = pad_to_note(row, col)
+                self.set_pad_color(note, 0)
         # Iluminar pads del banco activo
-        for nota, pad_config in banco.pads.items():
-            self.set_color_pad(nota, pad_config.color)
+        for note, pad_config in bank.pads.items():
+            self.set_pad_color(note, pad_config.color)
         # Actualizar botones de escena
-        for i, b in enumerate(todos_bancos):
-            if i == indice_banco_activo:
-                self.iniciar_parpadeo_escena(i, color=3)  # titila verde
+        for i, b in enumerate(all_banks):
+            if i == active_bank_index:
+                self.start_scene_blink(i, color=3)  # titila verde
             elif b.pads:
-                self.set_color_escena(i, color=1)  # iluminado fijo bajo
+                self.set_scene_color(i, color=1)  # iluminado fijo bajo
             else:
-                self.set_color_escena(i, color=0)  # apagado
+                self.set_scene_color(i, color=0)  # apagado
 
-    def iniciar_parpadeo_escena(self, indice_banco: int, color: int) -> None:
-        cc = 104 + indice_banco
-        if self._conectado:
+    def start_scene_blink(self, bank_index: int, color: int) -> None:
+        cc = 104 + bank_index
+        if self._connected:
             self._midi_out.send_message([0xB1, cc, color])  # canal 2 = titila
 
-    def _on_mensaje(self, mensaje, datos=None) -> None:
-        msg, _ = mensaje
-        status, nota, velocity = msg[0], msg[1], msg[2]
+    def _on_message(self, message, data=None) -> None:
+        msg, _ = message
+        status, note, velocity = msg[0], msg[1], msg[2]
         if velocity == 0:
             return
-        canal = status & 0x0F
-        tipo = status & 0xF0
-        if tipo == 0x90 and canal == 0:  # note_on canal 1
-            if 11 <= nota <= 88 and nota % 10 != 9:  # pad del grid
+        channel = status & 0x0F
+        msg_type = status & 0xF0
+        if msg_type == 0x90 and channel == 0:  # note_on canal 1
+            if 11 <= note <= 88 and note % 10 != 9:  # pad del grid
                 if self._callback_pad:
-                    self._callback_pad(nota)
-        elif tipo == 0xB0:  # control change (botones de escena)
-            if nota in NOTAS_ESCENA and self._callback_escena:
-                self._callback_escena(nota - 104)
+                    self._callback_pad(note)
+        elif msg_type == 0xB0:  # control change (botones de escena)
+            if note in SCENE_NOTES and self._callback_scene:
+                self._callback_scene(note - 104)
 
     @property
-    def conectado(self) -> bool:
-        return self._conectado
+    def connected(self) -> bool:
+        return self._connected
 
     @property
-    def nombre_dispositivo(self) -> str:
-        if not self._conectado:
+    def device_name(self) -> str:
+        if not self._connected:
             return "Sin conexión"
-        puertos = self._midi_in.get_ports()
-        return puertos[0] if puertos else "Desconocido"
+        ports = self._midi_in.get_ports()
+        return ports[0] if ports else "Desconocido"
 ```
 
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_motor_midi.py -v
+pytest tests/test_midi_engine.py -v
 ```
 
 Esperado: 8 tests PASSED
@@ -865,8 +865,8 @@ Esperado: 8 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add motor/motor_midi.py tests/test_motor_midi.py
-git commit -S -m "feat: motor MIDI — conexión, colores, parpadeo LP Mini MK2"
+git add engine/midi_engine.py tests/test_midi_engine.py
+git commit -S -m "feat: MIDI engine — connection, colors, blink LP Mini MK2"
 ```
 
 ---
@@ -901,7 +901,7 @@ Esperado: sin errores de importación
 
 ```bash
 git add tests/conftest.py
-git commit -S -m "test: fixture QApplication para tests de UI"
+git commit -S -m "test: QApplication fixture for UI tests"
 ```
 
 ---
@@ -909,67 +909,67 @@ git commit -S -m "test: fixture QApplication para tests de UI"
 ## Tarea 7: Widget Grid de Pads
 
 **Archivos:**
-- Crear: `ui/grid_pads.py`
-- Crear: `tests/test_grid_pads.py`
+- Crear: `ui/pad_grid.py`
+- Crear: `tests/test_pad_grid.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_grid_pads.py`:
+Crear `tests/test_pad_grid.py`:
 
 ```python
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
-from ui.grid_pads import GridPads
+from ui.pad_grid import PadGrid
 
-COLORES_LP = {0: "#000000", 3: "#FF0000", 5: "#00FF00", 9: "#FFFF00"}
+LP_COLORS = {0: "#000000", 3: "#FF0000", 5: "#00FF00", 9: "#FFFF00"}
 
 
 @pytest.fixture
 def grid(qapp):
-    g = GridPads(colores_paleta=COLORES_LP)
+    g = PadGrid(color_palette=LP_COLORS)
     return g
 
 
-def test_grid_crea_64_botones(grid):
-    assert len(grid.botones) == 64
+def test_grid_creates_64_buttons(grid):
+    assert len(grid.buttons) == 64
 
 
-def test_pad_sin_config_aparece_oscuro(grid):
+def test_pad_without_config_appears_dark(grid):
     # pad (0,0) → sin config → color oscuro (#1a1a1a)
-    btn = grid.botones[(0, 0)]
+    btn = grid.buttons[(0, 0)]
     assert "1a1a1a" in btn.styleSheet().lower() or "background" in btn.styleSheet()
 
 
-def test_set_color_pad_actualiza_boton(grid):
-    grid.set_color_pad(fila=0, col=0, color=3)
-    btn = grid.botones[(0, 0)]
+def test_set_pad_color_updates_button(grid):
+    grid.set_pad_color(row=0, col=0, color=3)
+    btn = grid.buttons[(0, 0)]
     assert "ff0000" in btn.styleSheet().lower()
 
 
-def test_click_pad_emite_senal(grid, qtbot):
-    señales = []
-    grid.pad_seleccionado.connect(lambda f, c: señales.append((f, c)))
-    btn = grid.botones[(2, 3)]
+def test_click_pad_emits_signal(grid, qtbot):
+    signals = []
+    grid.pad_selected.connect(lambda r, c: signals.append((r, c)))
+    btn = grid.buttons[(2, 3)]
     qtbot.mouseClick(btn, Qt.MouseButton.LeftButton)
-    assert señales == [(2, 3)]
+    assert signals == [(2, 3)]
 
 
-def test_seleccionar_pad_marca_borde(grid):
-    grid.seleccionar(fila=1, col=2)
-    btn = grid.botones[(1, 2)]
+def test_select_pad_marks_border(grid):
+    grid.select(row=1, col=2)
+    btn = grid.buttons[(1, 2)]
     assert "border" in btn.styleSheet()
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_grid_pads.py -v
+pytest tests/test_pad_grid.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'ui.grid_pads'`
+Esperado: `ModuleNotFoundError: No module named 'ui.pad_grid'`
 
-- [ ] **Paso 3: Implementar ui/grid_pads.py**
+- [ ] **Paso 3: Implementar ui/pad_grid.py**
 
 ```python
 from __future__ import annotations
@@ -977,57 +977,57 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QWidget, QGridLayout, QPushButton
 
 
-class GridPads(QWidget):
-    pad_seleccionado = pyqtSignal(int, int)  # fila, col
+class PadGrid(QWidget):
+    pad_selected = pyqtSignal(int, int)  # row, col
 
-    def __init__(self, colores_paleta: dict[int, str], parent=None) -> None:
+    def __init__(self, color_palette: dict[int, str], parent=None) -> None:
         super().__init__(parent)
-        self._colores_paleta = colores_paleta
-        self._colores_actuales: dict[tuple[int, int], int] = {}
-        self._seleccionado: tuple[int, int] | None = None
-        self.botones: dict[tuple[int, int], QPushButton] = {}
+        self._color_palette = color_palette
+        self._current_colors: dict[tuple[int, int], int] = {}
+        self._selected: tuple[int, int] | None = None
+        self.buttons: dict[tuple[int, int], QPushButton] = {}
         layout = QGridLayout(self)
         layout.setSpacing(3)
         layout.setContentsMargins(4, 4, 4, 4)
-        for fila in range(8):
+        for row in range(8):
             for col in range(8):
                 btn = QPushButton()
                 btn.setFixedSize(44, 44)
-                btn.setStyleSheet(self._estilo_pad(color=0, seleccionado=False))
-                btn.clicked.connect(lambda _, f=fila, c=col: self._on_click(f, c))
-                layout.addWidget(btn, fila, col)
-                self.botones[(fila, col)] = btn
+                btn.setStyleSheet(self._pad_style(color=0, selected=False))
+                btn.clicked.connect(lambda _, r=row, c=col: self._on_click(r, c))
+                layout.addWidget(btn, row, col)
+                self.buttons[(row, col)] = btn
 
-    def set_color_pad(self, fila: int, col: int, color: int) -> None:
-        self._colores_actuales[(fila, col)] = color
-        seleccionado = self._seleccionado == (fila, col)
-        self.botones[(fila, col)].setStyleSheet(
-            self._estilo_pad(color=color, seleccionado=seleccionado)
+    def set_pad_color(self, row: int, col: int, color: int) -> None:
+        self._current_colors[(row, col)] = color
+        selected = self._selected == (row, col)
+        self.buttons[(row, col)].setStyleSheet(
+            self._pad_style(color=color, selected=selected)
         )
 
-    def seleccionar(self, fila: int, col: int) -> None:
-        if self._seleccionado:
-            f0, c0 = self._seleccionado
-            color_prev = self._colores_actuales.get((f0, c0), 0)
-            self.botones[(f0, c0)].setStyleSheet(
-                self._estilo_pad(color=color_prev, seleccionado=False)
+    def select(self, row: int, col: int) -> None:
+        if self._selected:
+            r0, c0 = self._selected
+            prev_color = self._current_colors.get((r0, c0), 0)
+            self.buttons[(r0, c0)].setStyleSheet(
+                self._pad_style(color=prev_color, selected=False)
             )
-        self._seleccionado = (fila, col)
-        color = self._colores_actuales.get((fila, col), 0)
-        self.botones[(fila, col)].setStyleSheet(
-            self._estilo_pad(color=color, seleccionado=True)
+        self._selected = (row, col)
+        color = self._current_colors.get((row, col), 0)
+        self.buttons[(row, col)].setStyleSheet(
+            self._pad_style(color=color, selected=True)
         )
 
-    def _on_click(self, fila: int, col: int) -> None:
-        self.seleccionar(fila, col)
-        self.pad_seleccionado.emit(fila, col)
+    def _on_click(self, row: int, col: int) -> None:
+        self.select(row, col)
+        self.pad_selected.emit(row, col)
 
-    def _estilo_pad(self, color: int, seleccionado: bool) -> str:
-        hex_color = self._colores_paleta.get(color, "#1a1a1a")
-        borde = "2px solid #ffffff" if seleccionado else "1px solid #333333"
+    def _pad_style(self, color: int, selected: bool) -> str:
+        hex_color = self._color_palette.get(color, "#1a1a1a")
+        border = "2px solid #ffffff" if selected else "1px solid #333333"
         return (
             f"background-color: {hex_color};"
-            f"border: {borde};"
+            f"border: {border};"
             f"border-radius: 4px;"
         )
 ```
@@ -1035,7 +1035,7 @@ class GridPads(QWidget):
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_grid_pads.py -v
+pytest tests/test_pad_grid.py -v
 ```
 
 Esperado: 5 tests PASSED
@@ -1043,8 +1043,8 @@ Esperado: 5 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add ui/grid_pads.py tests/test_grid_pads.py
-git commit -S -m "feat: widget grid 8x8 de pads con colores y selección"
+git add ui/pad_grid.py tests/test_pad_grid.py
+git commit -S -m "feat: 8x8 pad grid widget with colors and selection"
 ```
 
 ---
@@ -1052,53 +1052,53 @@ git commit -S -m "feat: widget grid 8x8 de pads con colores y selección"
 ## Tarea 8: Selector de bancos
 
 **Archivos:**
-- Crear: `ui/selector_bancos.py`
-- Crear: `tests/test_selector_bancos.py`
+- Crear: `ui/bank_selector.py`
+- Crear: `tests/test_bank_selector.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_selector_bancos.py`:
+Crear `tests/test_bank_selector.py`:
 
 ```python
 import pytest
-from ui.selector_bancos import SelectorBancos
+from ui.bank_selector import BankSelector
 
 
 @pytest.fixture
 def selector(qapp):
-    return SelectorBancos(nombres=["A", "B", "C"])
+    return BankSelector(names=["A", "B", "C"])
 
 
-def test_muestra_bancos_iniciales(selector):
+def test_shows_initial_banks(selector):
     assert selector.count() == 3
 
 
-def test_agregar_banco(selector):
-    selector.agregar_banco("D")
+def test_add_bank(selector):
+    selector.add_bank("D")
     assert selector.count() == 4
 
 
-def test_cambio_banco_emite_senal(selector, qtbot):
-    señales = []
-    selector.banco_cambiado.connect(señales.append)
+def test_bank_change_emits_signal(selector, qtbot):
+    signals = []
+    selector.bank_changed.connect(signals.append)
     selector.setCurrentIndex(1)
-    assert 1 in señales
+    assert 1 in signals
 
 
-def test_banco_activo_index(selector):
+def test_active_bank_index(selector):
     selector.setCurrentIndex(2)
-    assert selector.banco_activo == 2
+    assert selector.active_bank == 2
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_selector_bancos.py -v
+pytest tests/test_bank_selector.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'ui.selector_bancos'`
+Esperado: `ModuleNotFoundError: No module named 'ui.bank_selector'`
 
-- [ ] **Paso 3: Implementar ui/selector_bancos.py**
+- [ ] **Paso 3: Implementar ui/bank_selector.py**
 
 ```python
 from __future__ import annotations
@@ -1106,27 +1106,27 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QTabBar
 
 
-class SelectorBancos(QTabBar):
-    banco_cambiado = pyqtSignal(int)
+class BankSelector(QTabBar):
+    bank_changed = pyqtSignal(int)
 
-    def __init__(self, nombres: list[str], parent=None) -> None:
+    def __init__(self, names: list[str], parent=None) -> None:
         super().__init__(parent)
-        for nombre in nombres:
-            self.addTab(nombre)
-        self.currentChanged.connect(self.banco_cambiado)
+        for name in names:
+            self.addTab(name)
+        self.currentChanged.connect(self.bank_changed)
 
-    def agregar_banco(self, nombre: str) -> None:
-        self.addTab(nombre)
+    def add_bank(self, name: str) -> None:
+        self.addTab(name)
 
     @property
-    def banco_activo(self) -> int:
+    def active_bank(self) -> int:
         return self.currentIndex()
 ```
 
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_selector_bancos.py -v
+pytest tests/test_bank_selector.py -v
 ```
 
 Esperado: 4 tests PASSED
@@ -1134,8 +1134,8 @@ Esperado: 4 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add ui/selector_bancos.py tests/test_selector_bancos.py
-git commit -S -m "feat: widget selector de bancos (tabs A-H)"
+git add ui/bank_selector.py tests/test_bank_selector.py
+git commit -S -m "feat: bank selector widget (tabs A-H)"
 ```
 
 ---
@@ -1143,57 +1143,57 @@ git commit -S -m "feat: widget selector de bancos (tabs A-H)"
 ## Tarea 9: Paleta de colores LP Mini MK2
 
 **Archivos:**
-- Crear: `ui/paleta_colores.py`
-- Crear: `tests/test_paleta_colores.py`
+- Crear: `ui/color_palette.py`
+- Crear: `tests/test_color_palette.py`
 
-> Esta paleta es compartida por `panel_config_pad.py` y `dialogo_config_pad.py`.
+> Esta paleta es compartida por `pad_config_panel.py` y `pad_config_dialog.py`.
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_paleta_colores.py`:
+Crear `tests/test_color_palette.py`:
 
 ```python
 import pytest
-from ui.paleta_colores import PaletaColores, COLORES_LP
+from ui.color_palette import ColorPalette, LP_COLORS
 
 
-def test_paleta_tiene_64_entradas():
-    assert len(COLORES_LP) == 64
+def test_palette_has_64_entries():
+    assert len(LP_COLORS) == 64
 
 
-def test_color_0_es_negro():
-    assert COLORES_LP[0].lower() == "#000000"
+def test_color_0_is_black():
+    assert LP_COLORS[0].lower() == "#000000"
 
 
-def test_paleta_widget_crea_64_botones(qapp):
-    paleta = PaletaColores()
-    assert len(paleta.botones) == 64
+def test_palette_widget_creates_64_buttons(qapp):
+    palette = ColorPalette()
+    assert len(palette.buttons) == 64
 
 
-def test_click_color_emite_senal(qapp, qtbot):
-    paleta = PaletaColores()
-    señales = []
-    paleta.color_seleccionado.connect(señales.append)
+def test_click_color_emits_signal(qapp, qtbot):
+    palette = ColorPalette()
+    signals = []
+    palette.color_selected.connect(signals.append)
     from PyQt6.QtCore import Qt
-    qtbot.mouseClick(paleta.botones[3], Qt.MouseButton.LeftButton)
-    assert señales == [3]
+    qtbot.mouseClick(palette.buttons[3], Qt.MouseButton.LeftButton)
+    assert signals == [3]
 
 
-def test_marcar_color_activo(qapp):
-    paleta = PaletaColores()
-    paleta.set_color_activo(5)
-    assert "border: 2px solid" in paleta.botones[5].styleSheet()
+def test_mark_active_color(qapp):
+    palette = ColorPalette()
+    palette.set_active_color(5)
+    assert "border: 2px solid" in palette.buttons[5].styleSheet()
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_paleta_colores.py -v
+pytest tests/test_color_palette.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'ui.paleta_colores'`
+Esperado: `ModuleNotFoundError: No module named 'ui.color_palette'`
 
-- [ ] **Paso 3: Implementar ui/paleta_colores.py**
+- [ ] **Paso 3: Implementar ui/color_palette.py**
 
 ```python
 from __future__ import annotations
@@ -1201,7 +1201,7 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QWidget, QGridLayout, QPushButton
 
 # Paleta nativa Launchpad Mini MK2: índice (velocity) → hex RGB aproximado
-COLORES_LP: dict[int, str] = {
+LP_COLORS: dict[int, str] = {
     0: "#000000", 1: "#1E1E1E", 2: "#7F7F7F", 3: "#FFFFFF",
     4: "#FF4D4D", 5: "#FF0000", 6: "#590000", 7: "#170000",
     8: "#FFBD6E", 9: "#FF5400", 10: "#591D00", 11: "#271B00",
@@ -1221,42 +1221,42 @@ COLORES_LP: dict[int, str] = {
 }
 
 
-class PaletaColores(QWidget):
-    color_seleccionado = pyqtSignal(int)  # índice de color (0-63)
+class ColorPalette(QWidget):
+    color_selected = pyqtSignal(int)  # índice de color (0-63)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self._color_activo: int | None = None
-        self.botones: dict[int, QPushButton] = {}
+        self._active_color: int | None = None
+        self.buttons: dict[int, QPushButton] = {}
         layout = QGridLayout(self)
         layout.setSpacing(2)
         layout.setContentsMargins(2, 2, 2, 2)
         for idx in range(64):
-            fila, col = divmod(idx, 8)
+            row, col = divmod(idx, 8)
             btn = QPushButton()
             btn.setFixedSize(22, 22)
-            hex_c = COLORES_LP.get(idx, "#000000")
+            hex_c = LP_COLORS.get(idx, "#000000")
             btn.setStyleSheet(
                 f"background-color:{hex_c}; border:1px solid #333; border-radius:2px;"
             )
             btn.clicked.connect(lambda _, i=idx: self._on_click(i))
-            layout.addWidget(btn, fila, col)
-            self.botones[idx] = btn
+            layout.addWidget(btn, row, col)
+            self.buttons[idx] = btn
 
-    def _on_click(self, indice: int) -> None:
-        self.set_color_activo(indice)
-        self.color_seleccionado.emit(indice)
+    def _on_click(self, index: int) -> None:
+        self.set_active_color(index)
+        self.color_selected.emit(index)
 
-    def set_color_activo(self, indice: int) -> None:
-        if self._color_activo is not None:
-            prev = self._color_activo
-            hex_c = COLORES_LP.get(prev, "#000000")
-            self.botones[prev].setStyleSheet(
+    def set_active_color(self, index: int) -> None:
+        if self._active_color is not None:
+            prev = self._active_color
+            hex_c = LP_COLORS.get(prev, "#000000")
+            self.buttons[prev].setStyleSheet(
                 f"background-color:{hex_c}; border:1px solid #333; border-radius:2px;"
             )
-        self._color_activo = indice
-        hex_c = COLORES_LP.get(indice, "#000000")
-        self.botones[indice].setStyleSheet(
+        self._active_color = index
+        hex_c = LP_COLORS.get(index, "#000000")
+        self.buttons[index].setStyleSheet(
             f"background-color:{hex_c}; border:2px solid #ffffff; border-radius:2px;"
         )
 ```
@@ -1264,7 +1264,7 @@ class PaletaColores(QWidget):
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_paleta_colores.py -v
+pytest tests/test_color_palette.py -v
 ```
 
 Esperado: 5 tests PASSED
@@ -1272,8 +1272,8 @@ Esperado: 5 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add ui/paleta_colores.py tests/test_paleta_colores.py
-git commit -S -m "feat: paleta de 64 colores nativos LP Mini MK2"
+git add ui/color_palette.py tests/test_color_palette.py
+git commit -S -m "feat: 64 native LP Mini MK2 color palette"
 ```
 
 ---
@@ -1281,63 +1281,63 @@ git commit -S -m "feat: paleta de 64 colores nativos LP Mini MK2"
 ## Tarea 10: Panel de configuración de pad
 
 **Archivos:**
-- Crear: `ui/panel_config_pad.py`
-- Crear: `tests/test_panel_config_pad.py`
+- Crear: `ui/pad_config_panel.py`
+- Crear: `tests/test_pad_config_panel.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_panel_config_pad.py`:
+Crear `tests/test_pad_config_panel.py`:
 
 ```python
 import pytest
 from unittest.mock import patch
-from modelos.proyecto import PadConfig
-from ui.panel_config_pad import PanelConfigPad
+from models.project import PadConfig
+from ui.pad_config_panel import PadConfigPanel
 
 
 @pytest.fixture
 def panel(qapp):
-    return PanelConfigPad()
+    return PadConfigPanel()
 
 
-def test_panel_muestra_pad_vacio(panel):
-    panel.mostrar_pad(pad_id=11, config=None)
-    assert panel.label_archivo.text() == "Sin audio"
+def test_panel_shows_empty_pad(panel):
+    panel.show_pad(pad_id=11, config=None)
+    assert panel.label_file.text() == "Sin audio"
 
 
-def test_panel_muestra_pad_con_config(panel):
-    config = PadConfig(audio_file="/ruta/kick.wav", color=3)
-    panel.mostrar_pad(pad_id=11, config=config)
-    assert "kick.wav" in panel.label_archivo.text()
+def test_panel_shows_pad_with_config(panel):
+    config = PadConfig(audio_file="/path/kick.wav", color=3)
+    panel.show_pad(pad_id=11, config=config)
+    assert "kick.wav" in panel.label_file.text()
 
 
-def test_cambio_color_emite_senal(panel, qtbot):
-    panel.mostrar_pad(pad_id=11, config=None)
-    señales = []
-    panel.color_cambiado.connect(lambda pad, color: señales.append((pad, color)))
-    panel.paleta.color_seleccionado.emit(5)
-    assert señales == [(11, 5)]
+def test_color_change_emits_signal(panel, qtbot):
+    panel.show_pad(pad_id=11, config=None)
+    signals = []
+    panel.color_changed.connect(lambda pad, color: signals.append((pad, color)))
+    panel.palette.color_selected.emit(5)
+    assert signals == [(11, 5)]
 
 
-def test_seleccionar_audio_emite_senal(panel, qtbot):
-    panel.mostrar_pad(pad_id=11, config=None)
-    señales = []
-    panel.audio_cambiado.connect(lambda pad, ruta: señales.append((pad, ruta)))
-    with patch("ui.panel_config_pad.QFileDialog.getOpenFileName",
-               return_value=("/ruta/kick.wav", "")):
-        panel.btn_seleccionar.click()
-    assert señales == [(11, "/ruta/kick.wav")]
+def test_select_audio_emits_signal(panel, qtbot):
+    panel.show_pad(pad_id=11, config=None)
+    signals = []
+    panel.audio_changed.connect(lambda pad, path: signals.append((pad, path)))
+    with patch("ui.pad_config_panel.QFileDialog.getOpenFileName",
+               return_value=("/path/kick.wav", "")):
+        panel.btn_select.click()
+    assert signals == [(11, "/path/kick.wav")]
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_panel_config_pad.py -v
+pytest tests/test_pad_config_panel.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'ui.panel_config_pad'`
+Esperado: `ModuleNotFoundError: No module named 'ui.pad_config_panel'`
 
-- [ ] **Paso 3: Implementar ui/panel_config_pad.py**
+- [ ] **Paso 3: Implementar ui/pad_config_panel.py**
 
 ```python
 from __future__ import annotations
@@ -1346,67 +1346,67 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QFileDialog
 )
-from modelos.proyecto import PadConfig
-from ui.paleta_colores import PaletaColores
+from models.project import PadConfig
+from ui.color_palette import ColorPalette
 
 
-FILTRO_AUDIO = "Audio (*.wav *.mp3 *.ogg *.flac)"
+AUDIO_FILTER = "Audio (*.wav *.mp3 *.ogg *.flac)"
 
 
-class PanelConfigPad(QWidget):
-    color_cambiado = pyqtSignal(int, int)   # pad_id, color
-    audio_cambiado = pyqtSignal(int, str)   # pad_id, ruta
+class PadConfigPanel(QWidget):
+    color_changed = pyqtSignal(int, int)   # pad_id, color
+    audio_changed = pyqtSignal(int, str)   # pad_id, path
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._pad_id: Optional[int] = None
         layout = QVBoxLayout(self)
 
-        self.label_titulo = QLabel("Seleccioná un pad")
-        layout.addWidget(self.label_titulo)
+        self.label_title = QLabel("Seleccioná un pad")
+        layout.addWidget(self.label_title)
 
-        self.paleta = PaletaColores()
-        self.paleta.color_seleccionado.connect(self._on_color)
-        layout.addWidget(self.paleta)
+        self.palette = ColorPalette()
+        self.palette.color_selected.connect(self._on_color)
+        layout.addWidget(self.palette)
 
-        self.btn_seleccionar = QPushButton("Seleccionar audio...")
-        self.btn_seleccionar.clicked.connect(self._on_seleccionar_audio)
-        layout.addWidget(self.btn_seleccionar)
+        self.btn_select = QPushButton("Seleccionar audio...")
+        self.btn_select.clicked.connect(self._on_select_audio)
+        layout.addWidget(self.btn_select)
 
-        self.label_archivo = QLabel("Sin audio")
-        self.label_archivo.setWordWrap(True)
-        layout.addWidget(self.label_archivo)
+        self.label_file = QLabel("Sin audio")
+        self.label_file.setWordWrap(True)
+        layout.addWidget(self.label_file)
 
         layout.addStretch()
 
-    def mostrar_pad(self, pad_id: int, config: Optional[PadConfig]) -> None:
+    def show_pad(self, pad_id: int, config: Optional[PadConfig]) -> None:
         self._pad_id = pad_id
-        self.label_titulo.setText(f"Pad {pad_id}")
+        self.label_title.setText(f"Pad {pad_id}")
         if config:
             import os
-            self.label_archivo.setText(os.path.basename(config.audio_file))
-            self.paleta.set_color_activo(config.color)
+            self.label_file.setText(os.path.basename(config.audio_file))
+            self.palette.set_active_color(config.color)
         else:
-            self.label_archivo.setText("Sin audio")
+            self.label_file.setText("Sin audio")
 
     def _on_color(self, color: int) -> None:
         if self._pad_id is not None:
-            self.color_cambiado.emit(self._pad_id, color)
+            self.color_changed.emit(self._pad_id, color)
 
-    def _on_seleccionar_audio(self) -> None:
+    def _on_select_audio(self) -> None:
         if self._pad_id is None:
             return
-        ruta, _ = QFileDialog.getOpenFileName(self, "Seleccionar audio", "", FILTRO_AUDIO)
-        if ruta:
+        path, _ = QFileDialog.getOpenFileName(self, "Seleccionar audio", "", AUDIO_FILTER)
+        if path:
             import os
-            self.label_archivo.setText(os.path.basename(ruta))
-            self.audio_cambiado.emit(self._pad_id, ruta)
+            self.label_file.setText(os.path.basename(path))
+            self.audio_changed.emit(self._pad_id, path)
 ```
 
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_panel_config_pad.py -v
+pytest tests/test_pad_config_panel.py -v
 ```
 
 Esperado: 4 tests PASSED
@@ -1414,8 +1414,8 @@ Esperado: 4 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add ui/panel_config_pad.py tests/test_panel_config_pad.py
-git commit -S -m "feat: panel de configuración de pad (color + audio)"
+git add ui/pad_config_panel.py tests/test_pad_config_panel.py
+git commit -S -m "feat: pad config panel (color + audio)"
 ```
 
 ---
@@ -1423,65 +1423,65 @@ git commit -S -m "feat: panel de configuración de pad (color + audio)"
 ## Tarea 11: Diálogo de configuración de pad (Modo Asignación)
 
 **Archivos:**
-- Crear: `ui/dialogo_config_pad.py`
-- Crear: `tests/test_dialogo_config_pad.py`
+- Crear: `ui/pad_config_dialog.py`
+- Crear: `tests/test_pad_config_dialog.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_dialogo_config_pad.py`:
+Crear `tests/test_pad_config_dialog.py`:
 
 ```python
 import pytest
 from unittest.mock import patch
-from modelos.proyecto import PadConfig
-from ui.dialogo_config_pad import DialogoConfigPad
+from models.project import PadConfig
+from ui.pad_config_dialog import PadConfigDialog
 
 
 @pytest.fixture
-def dialogo_vacio(qapp):
-    return DialogoConfigPad(pad_id=11, config_actual=None)
+def empty_dialog(qapp):
+    return PadConfigDialog(pad_id=11, current_config=None)
 
 
 @pytest.fixture
-def dialogo_con_config(qapp):
-    config = PadConfig(audio_file="/ruta/kick.wav", color=3)
-    return DialogoConfigPad(pad_id=11, config_actual=config)
+def dialog_with_config(qapp):
+    config = PadConfig(audio_file="/path/kick.wav", color=3)
+    return PadConfigDialog(pad_id=11, current_config=config)
 
 
-def test_dialogo_vacio_muestra_sin_audio(dialogo_vacio):
-    assert dialogo_vacio.label_archivo.text() == "Sin audio"
+def test_empty_dialog_shows_no_audio(empty_dialog):
+    assert empty_dialog.label_file.text() == "Sin audio"
 
 
-def test_dialogo_carga_config_existente(dialogo_con_config):
-    assert "kick.wav" in dialogo_con_config.label_archivo.text()
+def test_dialog_loads_existing_config(dialog_with_config):
+    assert "kick.wav" in dialog_with_config.label_file.text()
 
 
-def test_guardar_retorna_pad_config(dialogo_vacio, qtbot):
-    with patch("ui.dialogo_config_pad.QFileDialog.getOpenFileName",
-               return_value=("/ruta/snare.wav", "")):
-        dialogo_vacio.btn_seleccionar.click()
-    dialogo_vacio.paleta.color_seleccionado.emit(7)
-    resultado = dialogo_vacio.obtener_config()
-    assert resultado is not None
-    assert resultado.audio_file == "/ruta/snare.wav"
-    assert resultado.color == 7
+def test_save_returns_pad_config(empty_dialog, qtbot):
+    with patch("ui.pad_config_dialog.QFileDialog.getOpenFileName",
+               return_value=("/path/snare.wav", "")):
+        empty_dialog.btn_select.click()
+    empty_dialog.palette.color_selected.emit(7)
+    result = empty_dialog.get_config()
+    assert result is not None
+    assert result.audio_file == "/path/snare.wav"
+    assert result.color == 7
 
 
-def test_cancelar_retorna_none(dialogo_vacio):
-    dialogo_vacio.reject()
-    # obtener_config luego de reject debe retornar None
-    assert dialogo_vacio.result() == 0
+def test_cancel_returns_none(empty_dialog):
+    empty_dialog.reject()
+    # get_config luego de reject debe retornar None
+    assert empty_dialog.result() == 0
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_dialogo_config_pad.py -v
+pytest tests/test_pad_config_dialog.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'ui.dialogo_config_pad'`
+Esperado: `ModuleNotFoundError: No module named 'ui.pad_config_dialog'`
 
-- [ ] **Paso 3: Implementar ui/dialogo_config_pad.py**
+- [ ] **Paso 3: Implementar ui/pad_config_dialog.py**
 
 ```python
 from __future__ import annotations
@@ -1492,23 +1492,23 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QDialogButtonBox,
 )
-from modelos.proyecto import PadConfig
-from ui.paleta_colores import PaletaColores
+from models.project import PadConfig
+from ui.color_palette import ColorPalette
 
-FILTRO_AUDIO = "Audio (*.wav *.mp3 *.ogg *.flac)"
+AUDIO_FILTER = "Audio (*.wav *.mp3 *.ogg *.flac)"
 
 
-class DialogoConfigPad(QDialog):
+class PadConfigDialog(QDialog):
     def __init__(
         self,
         pad_id: int,
-        config_actual: Optional[PadConfig],
+        current_config: Optional[PadConfig],
         parent=None,
     ) -> None:
         super().__init__(parent)
         self._pad_id = pad_id
-        self._ruta_audio: str = config_actual.audio_file if config_actual else ""
-        self._color: int = config_actual.color if config_actual else 0
+        self._audio_path: str = current_config.audio_file if current_config else ""
+        self._color: int = current_config.color if current_config else 0
         self.setWindowTitle(f"Configurar Pad {pad_id}")
         self.setMinimumWidth(280)
         layout = QVBoxLayout(self)
@@ -1517,55 +1517,55 @@ class DialogoConfigPad(QDialog):
 
         # Audio
         layout.addWidget(QLabel("Archivo de audio:"))
-        fila_audio = QHBoxLayout()
-        nombre = os.path.basename(self._ruta_audio) if self._ruta_audio else "Sin audio"
-        self.label_archivo = QLabel(nombre)
-        fila_audio.addWidget(self.label_archivo, 1)
-        self.btn_seleccionar = QPushButton("Seleccionar...")
-        self.btn_seleccionar.clicked.connect(self._on_seleccionar)
-        fila_audio.addWidget(self.btn_seleccionar)
-        layout.addLayout(fila_audio)
+        audio_row = QHBoxLayout()
+        name = os.path.basename(self._audio_path) if self._audio_path else "Sin audio"
+        self.label_file = QLabel(name)
+        audio_row.addWidget(self.label_file, 1)
+        self.btn_select = QPushButton("Seleccionar...")
+        self.btn_select.clicked.connect(self._on_select)
+        audio_row.addWidget(self.btn_select)
+        layout.addLayout(audio_row)
 
         # Color
         layout.addWidget(QLabel("Color del pad:"))
-        self.paleta = PaletaColores()
-        self.paleta.color_seleccionado.connect(self._on_color)
-        if config_actual:
-            self.paleta.set_color_activo(config_actual.color)
-        layout.addWidget(self.paleta)
+        self.palette = ColorPalette()
+        self.palette.color_selected.connect(self._on_color)
+        if current_config:
+            self.palette.set_active_color(current_config.color)
+        layout.addWidget(self.palette)
 
         # Botones
-        botones = QDialogButtonBox(
+        buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save |
             QDialogButtonBox.StandardButton.Cancel
         )
-        botones.button(QDialogButtonBox.StandardButton.Save).setText("Guardar")
-        botones.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
-        botones.accepted.connect(self.accept)
-        botones.rejected.connect(self.reject)
-        layout.addWidget(botones)
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText("Guardar")
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
 
-    def _on_seleccionar(self) -> None:
-        ruta, _ = QFileDialog.getOpenFileName(self, "Seleccionar audio", "", FILTRO_AUDIO)
-        if ruta:
-            self._ruta_audio = ruta
-            self.label_archivo.setText(os.path.basename(ruta))
+    def _on_select(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Seleccionar audio", "", AUDIO_FILTER)
+        if path:
+            self._audio_path = path
+            self.label_file.setText(os.path.basename(path))
 
     def _on_color(self, color: int) -> None:
         self._color = color
 
-    def obtener_config(self) -> Optional[PadConfig]:
+    def get_config(self) -> Optional[PadConfig]:
         if self.result() != QDialog.DialogCode.Accepted:
             return None
-        if not self._ruta_audio:
+        if not self._audio_path:
             return None
-        return PadConfig(audio_file=self._ruta_audio, color=self._color)
+        return PadConfig(audio_file=self._audio_path, color=self._color)
 ```
 
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_dialogo_config_pad.py -v
+pytest tests/test_pad_config_dialog.py -v
 ```
 
 Esperado: 4 tests PASSED
@@ -1573,8 +1573,8 @@ Esperado: 4 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add ui/dialogo_config_pad.py tests/test_dialogo_config_pad.py
-git commit -S -m "feat: diálogo de configuración de pad para Modo Asignación"
+git add ui/pad_config_dialog.py tests/test_pad_config_dialog.py
+git commit -S -m "feat: pad config dialog for Assignment Mode"
 ```
 
 ---
@@ -1582,41 +1582,41 @@ git commit -S -m "feat: diálogo de configuración de pad para Modo Asignación"
 ## Tarea 12: Diálogo Acerca de
 
 **Archivos:**
-- Crear: `ui/dialogo_acerca_de.py`
-- Crear: `tests/test_dialogo_acerca_de.py`
+- Crear: `ui/about_dialog.py`
+- Crear: `tests/test_about_dialog.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_dialogo_acerca_de.py`:
+Crear `tests/test_about_dialog.py`:
 
 ```python
-from ui.dialogo_acerca_de import DialogoAcercaDe
+from ui.about_dialog import AboutDialog
 
 
-def test_muestra_developer(qapp):
-    d = DialogoAcercaDe(dispositivo_conectado="Sin conexión")
+def test_shows_developer(qapp):
+    d = AboutDialog(connected_device="Sin conexión")
     assert "Martin Fernandez Funes" in d.label_info.text()
 
 
-def test_muestra_dispositivo_conectado(qapp):
-    d = DialogoAcercaDe(dispositivo_conectado="Launchpad Mini MK2")
+def test_shows_connected_device(qapp):
+    d = AboutDialog(connected_device="Launchpad Mini MK2")
     assert "Launchpad Mini MK2" in d.label_info.text()
 
 
-def test_muestra_sin_conexion(qapp):
-    d = DialogoAcercaDe(dispositivo_conectado="Sin conexión")
+def test_shows_no_connection(qapp):
+    d = AboutDialog(connected_device="Sin conexión")
     assert "Sin conexión" in d.label_info.text()
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_dialogo_acerca_de.py -v
+pytest tests/test_about_dialog.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'ui.dialogo_acerca_de'`
+Esperado: `ModuleNotFoundError: No module named 'ui.about_dialog'`
 
-- [ ] **Paso 3: Implementar ui/dialogo_acerca_de.py**
+- [ ] **Paso 3: Implementar ui/about_dialog.py**
 
 ```python
 from __future__ import annotations
@@ -1626,21 +1626,21 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
 VERSION = "1.0.0"
 
 
-class DialogoAcercaDe(QDialog):
-    def __init__(self, dispositivo_conectado: str, parent=None) -> None:
+class AboutDialog(QDialog):
+    def __init__(self, connected_device: str, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Acerca de")
         self.setFixedWidth(320)
         layout = QVBoxLayout(self)
         layout.setSpacing(8)
 
-        titulo = QLabel("<h2>Launchpad Mini MK2 Sampler</h2>")
-        titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(titulo)
+        title = QLabel("<h2>Launchpad Mini MK2 Sampler</h2>")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
 
         self.label_info = QLabel(
             f"<p><b>Versión:</b> {VERSION}</p>"
-            f"<p><b>Controladora:</b> {dispositivo_conectado}</p>"
+            f"<p><b>Controladora:</b> {connected_device}</p>"
             f"<p><b>Desarrollado por:</b> Martin Fernandez Funes</p>"
         )
         self.label_info.setWordWrap(True)
@@ -1655,7 +1655,7 @@ class DialogoAcercaDe(QDialog):
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_dialogo_acerca_de.py -v
+pytest tests/test_about_dialog.py -v
 ```
 
 Esperado: 3 tests PASSED
@@ -1663,8 +1663,8 @@ Esperado: 3 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add ui/dialogo_acerca_de.py tests/test_dialogo_acerca_de.py
-git commit -S -m "feat: diálogo Acerca de con versión, dispositivo y developer"
+git add ui/about_dialog.py tests/test_about_dialog.py
+git commit -S -m "feat: About dialog with version, device and developer"
 ```
 
 ---
@@ -1672,63 +1672,63 @@ git commit -S -m "feat: diálogo Acerca de con versión, dispositivo y developer
 ## Tarea 13: Panel de ajustes
 
 **Archivos:**
-- Crear: `ui/panel_ajustes.py`
-- Crear: `tests/test_panel_ajustes.py`
+- Crear: `ui/settings_panel.py`
+- Crear: `tests/test_settings_panel.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_panel_ajustes.py`:
+Crear `tests/test_settings_panel.py`:
 
 ```python
 import pytest
-from modelos.proyecto import Ajustes
-from ui.panel_ajustes import PanelAjustes
+from models.project import Settings
+from ui.settings_panel import SettingsPanel
 
 
 @pytest.fixture
-def ajustes():
-    return Ajustes(
-        midi_entrada="Launchpad Mini MK2",
-        midi_salida="Launchpad Mini MK2",
-        audio_salida="Built-in Audio",
-        volumen=0.8,
-        modo_reproduccion="unica",
+def settings():
+    return Settings(
+        midi_input="Launchpad Mini MK2",
+        midi_output="Launchpad Mini MK2",
+        audio_output="Built-in Audio",
+        volume=0.8,
+        play_mode="oneshot",
     )
 
 
-def test_panel_carga_ajustes(qapp, ajustes):
-    panel = PanelAjustes(
-        ajustes=ajustes,
-        dispositivos_midi=["Launchpad Mini MK2", "Otro"],
-        dispositivos_audio=["Built-in Audio", "Externo"],
+def test_panel_loads_settings(qapp, settings):
+    panel = SettingsPanel(
+        settings=settings,
+        midi_devices=["Launchpad Mini MK2", "Otro"],
+        audio_devices=["Built-in Audio", "Externo"],
     )
     assert panel.combo_midi_in.currentText() == "Launchpad Mini MK2"
     assert panel.combo_audio.currentText() == "Built-in Audio"
-    assert panel.combo_modo.currentText() == "Una vez"
+    assert panel.combo_mode.currentText() == "Una vez"
 
 
-def test_panel_emite_cambios(qapp, ajustes, qtbot):
-    panel = PanelAjustes(
-        ajustes=ajustes,
-        dispositivos_midi=["Launchpad Mini MK2"],
-        dispositivos_audio=["Built-in Audio"],
+def test_panel_emits_changes(qapp, settings, qtbot):
+    panel = SettingsPanel(
+        settings=settings,
+        midi_devices=["Launchpad Mini MK2"],
+        audio_devices=["Built-in Audio"],
     )
-    señales = []
-    panel.ajustes_cambiados.connect(señales.append)
-    panel.slider_volumen.setValue(60)
-    assert len(señales) == 1
-    assert señales[0].volumen == pytest.approx(0.6)
+    signals = []
+    panel.settings_changed.connect(signals.append)
+    panel.volume_slider.setValue(60)
+    assert len(signals) == 1
+    assert signals[0].volume == pytest.approx(0.6)
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_panel_ajustes.py -v
+pytest tests/test_settings_panel.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'ui.panel_ajustes'`
+Esperado: `ModuleNotFoundError: No module named 'ui.settings_panel'`
 
-- [ ] **Paso 3: Implementar ui/panel_ajustes.py**
+- [ ] **Paso 3: Implementar ui/settings_panel.py**
 
 ```python
 from __future__ import annotations
@@ -1737,82 +1737,82 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QFormLayout, QComboBox, QSlider, QLabel
 )
 from PyQt6.QtCore import Qt
-from modelos.proyecto import Ajustes
+from models.project import Settings
 
-MODOS = {"unica": "Una vez", "bucle": "Bucle", "alternar": "Alternar"}
-MODOS_INV = {v: k for k, v in MODOS.items()}
+MODES = {"oneshot": "Una vez", "loop": "Bucle", "toggle": "Alternar"}
+MODES_INV = {v: k for k, v in MODES.items()}
 
 
-class PanelAjustes(QWidget):
-    ajustes_cambiados = pyqtSignal(Ajustes)
+class SettingsPanel(QWidget):
+    settings_changed = pyqtSignal(Settings)
 
     def __init__(
         self,
-        ajustes: Ajustes,
-        dispositivos_midi: list[str],
-        dispositivos_audio: list[str],
+        settings: Settings,
+        midi_devices: list[str],
+        audio_devices: list[str],
         parent=None,
     ) -> None:
         super().__init__(parent)
-        self._ajustes = ajustes
+        self._settings = settings
         layout = QVBoxLayout(self)
         form = QFormLayout()
 
         self.combo_midi_in = QComboBox()
-        self.combo_midi_in.addItems(dispositivos_midi)
-        idx = self.combo_midi_in.findText(ajustes.midi_entrada)
+        self.combo_midi_in.addItems(midi_devices)
+        idx = self.combo_midi_in.findText(settings.midi_input)
         if idx >= 0:
             self.combo_midi_in.setCurrentIndex(idx)
-        self.combo_midi_in.currentTextChanged.connect(self._on_cambio)
+        self.combo_midi_in.currentTextChanged.connect(self._on_change)
         form.addRow("MIDI Entrada:", self.combo_midi_in)
 
         self.combo_midi_out = QComboBox()
-        self.combo_midi_out.addItems(dispositivos_midi)
-        idx = self.combo_midi_out.findText(ajustes.midi_salida)
+        self.combo_midi_out.addItems(midi_devices)
+        idx = self.combo_midi_out.findText(settings.midi_output)
         if idx >= 0:
             self.combo_midi_out.setCurrentIndex(idx)
-        self.combo_midi_out.currentTextChanged.connect(self._on_cambio)
+        self.combo_midi_out.currentTextChanged.connect(self._on_change)
         form.addRow("MIDI Salida:", self.combo_midi_out)
 
         self.combo_audio = QComboBox()
-        self.combo_audio.addItems(dispositivos_audio)
-        idx = self.combo_audio.findText(ajustes.audio_salida)
+        self.combo_audio.addItems(audio_devices)
+        idx = self.combo_audio.findText(settings.audio_output)
         if idx >= 0:
             self.combo_audio.setCurrentIndex(idx)
-        self.combo_audio.currentTextChanged.connect(self._on_cambio)
+        self.combo_audio.currentTextChanged.connect(self._on_change)
         form.addRow("Audio Salida:", self.combo_audio)
 
-        self.combo_modo = QComboBox()
-        self.combo_modo.addItems(list(MODOS.values()))
-        self.combo_modo.setCurrentText(MODOS.get(ajustes.modo_reproduccion, "Una vez"))
-        self.combo_modo.currentTextChanged.connect(self._on_cambio)
-        form.addRow("Modo reproducción:", self.combo_modo)
+        self.combo_mode = QComboBox()
+        self.combo_mode.addItems(list(MODES.values()))
+        self.combo_mode.setCurrentText(MODES.get(settings.play_mode, "Una vez"))
+        self.combo_mode.currentTextChanged.connect(self._on_change)
+        form.addRow("Modo reproducción:", self.combo_mode)
 
-        self.slider_volumen = QSlider(Qt.Orientation.Horizontal)
-        self.slider_volumen.setRange(0, 100)
-        self.slider_volumen.setValue(int(ajustes.volumen * 100))
-        self.slider_volumen.valueChanged.connect(self._on_cambio)
-        form.addRow("Volumen:", self.slider_volumen)
+        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(int(settings.volume * 100))
+        self.volume_slider.valueChanged.connect(self._on_change)
+        form.addRow("Volumen:", self.volume_slider)
 
         layout.addLayout(form)
         layout.addStretch()
 
-    def _on_cambio(self) -> None:
-        ajustes = Ajustes(
-            midi_entrada=self.combo_midi_in.currentText(),
-            midi_salida=self.combo_midi_out.currentText(),
-            audio_salida=self.combo_audio.currentText(),
-            volumen=self.slider_volumen.value() / 100.0,
-            modo_reproduccion=MODOS_INV.get(self.combo_modo.currentText(), "unica"),
+    def _on_change(self) -> None:
+        settings = Settings(
+            midi_input=self.combo_midi_in.currentText(),
+            midi_output=self.combo_midi_out.currentText(),
+            audio_output=self.combo_audio.currentText(),
+            volume=self.volume_slider.value() / 100.0,
+            play_mode=MODES_INV.get(self.combo_mode.currentText(), "oneshot"),
         )
-        self._ajustes = ajustes
-        self.ajustes_cambiados.emit(ajustes)
+        self._settings = settings
+        self.settings_changed.emit(settings)
 ```
 
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_panel_ajustes.py -v
+pytest tests/test_settings_panel.py -v
 ```
 
 Esperado: 2 tests PASSED
@@ -1820,8 +1820,8 @@ Esperado: 2 tests PASSED
 - [ ] **Paso 5: Commit**
 
 ```bash
-git add ui/panel_ajustes.py tests/test_panel_ajustes.py
-git commit -S -m "feat: panel de ajustes (MIDI, audio, volumen, modo)"
+git add ui/settings_panel.py tests/test_settings_panel.py
+git commit -S -m "feat: settings panel (MIDI, audio, volume, mode)"
 ```
 
 ---
@@ -1829,66 +1829,66 @@ git commit -S -m "feat: panel de ajustes (MIDI, audio, volumen, modo)"
 ## Tarea 14: Ventana principal
 
 **Archivos:**
-- Crear: `ui/ventana_principal.py`
-- Crear: `tests/test_ventana_principal.py`
+- Crear: `ui/main_window.py`
+- Crear: `tests/test_main_window.py`
 
 - [ ] **Paso 1: Escribir el test**
 
-Crear `tests/test_ventana_principal.py`:
+Crear `tests/test_main_window.py`:
 
 ```python
 import pytest
 from unittest.mock import MagicMock, patch
-from modelos.proyecto import Proyecto
-from ui.ventana_principal import VentanaPrincipal
+from models.project import Project
+from ui.main_window import MainWindow
 
 
 @pytest.fixture
-def ventana(qapp):
-    motor_midi = MagicMock()
-    motor_midi.conectado = False
-    motor_midi.nombre_dispositivo = "Sin conexión"
-    motor_midi.listar_dispositivos = MagicMock(return_value=[])
-    motor_audio = MagicMock()
-    proyecto = Proyecto.nuevo()
-    return VentanaPrincipal(proyecto=proyecto, motor_midi=motor_midi, motor_audio=motor_audio)
+def window(qapp):
+    midi_engine = MagicMock()
+    midi_engine.connected = False
+    midi_engine.device_name = "Sin conexión"
+    midi_engine.list_devices = MagicMock(return_value=[])
+    audio_engine = MagicMock()
+    project = Project.new()
+    return MainWindow(project=project, midi_engine=midi_engine, audio_engine=audio_engine)
 
 
-def test_ventana_tiene_titulo(ventana):
-    assert "Launchpad" in ventana.windowTitle()
+def test_window_has_title(window):
+    assert "Launchpad" in window.windowTitle()
 
 
-def test_barra_estado_muestra_desconectado(ventana):
-    assert "Desconectado" in ventana.label_estado.text() or \
-           "Sin conexión" in ventana.label_estado.text()
+def test_status_bar_shows_disconnected(window):
+    assert "Desconectado" in window.label_status.text() or \
+           "Sin conexión" in window.label_status.text()
 
 
-def test_modo_asignacion_inicia_desactivado(ventana):
-    assert ventana.modo_asignacion_activo is False
+def test_assignment_mode_starts_disabled(window):
+    assert window.assignment_mode_active is False
 
 
-def test_toggle_modo_asignacion(ventana):
-    ventana.toggle_modo_asignacion()
-    assert ventana.modo_asignacion_activo is True
-    ventana.toggle_modo_asignacion()
-    assert ventana.modo_asignacion_activo is False
+def test_toggle_assignment_mode(window):
+    window.toggle_assignment_mode()
+    assert window.assignment_mode_active is True
+    window.toggle_assignment_mode()
+    assert window.assignment_mode_active is False
 
 
-def test_cambiar_banco_actualiza_grid(ventana):
-    ventana.proyecto.bancos.append(__import__('modelos.proyecto', fromlist=['Banco']).Banco(nombre="B"))
-    ventana.on_banco_cambiado(1)
-    assert ventana.proyecto.banco_activo_indice == 1
+def test_change_bank_updates_grid(window):
+    window.project.banks.append(__import__('models.project', fromlist=['Bank']).Bank(name="B"))
+    window.on_bank_changed(1)
+    assert window.project.active_bank_index == 1
 ```
 
 - [ ] **Paso 2: Ejecutar test (debe fallar)**
 
 ```bash
-pytest tests/test_ventana_principal.py -v
+pytest tests/test_main_window.py -v
 ```
 
-Esperado: `ModuleNotFoundError: No module named 'ui.ventana_principal'`
+Esperado: `ModuleNotFoundError: No module named 'ui.main_window'`
 
-- [ ] **Paso 3: Implementar ui/ventana_principal.py**
+- [ ] **Paso 3: Implementar ui/main_window.py**
 
 ```python
 from __future__ import annotations
@@ -1900,288 +1900,288 @@ from PyQt6.QtWidgets import (
     QLabel, QSlider, QToolButton, QFileDialog, QMessageBox,
     QStackedWidget, QStatusBar,
 )
-from modelos.proyecto import PadConfig, Banco, Proyecto
-from motor.motor_audio import MotorAudio
-from motor.motor_midi import MotorMidi, pad_a_nota, nota_a_pad, listar_dispositivos_midi
-from ui.grid_pads import GridPads
-from ui.selector_bancos import SelectorBancos
-from ui.panel_config_pad import PanelConfigPad
-from ui.panel_ajustes import PanelAjustes
-from ui.dialogo_config_pad import DialogoConfigPad
-from ui.dialogo_acerca_de import DialogoAcercaDe
-from ui.paleta_colores import COLORES_LP
+from models.project import PadConfig, Bank, Project
+from engine.audio_engine import AudioEngine
+from engine.midi_engine import MidiEngine, pad_to_note, note_to_pad, list_midi_devices
+from ui.pad_grid import PadGrid
+from ui.bank_selector import BankSelector
+from ui.pad_config_panel import PadConfigPanel
+from ui.settings_panel import SettingsPanel
+from ui.pad_config_dialog import PadConfigDialog
+from ui.about_dialog import AboutDialog
+from ui.color_palette import LP_COLORS
 import sounddevice as sd
 
 
-FILTRO_PROYECTO = "Proyecto LP Sampler (*.lpsampler)"
+PROJECT_FILTER = "Proyecto LP Sampler (*.lpsampler)"
 
 
-class VentanaPrincipal(QMainWindow):
+class MainWindow(QMainWindow):
     def __init__(
         self,
-        proyecto: Proyecto,
-        motor_midi: MotorMidi,
-        motor_audio: MotorAudio,
+        project: Project,
+        midi_engine: MidiEngine,
+        audio_engine: AudioEngine,
         parent=None,
     ) -> None:
         super().__init__(parent)
-        self.proyecto = proyecto
-        self.motor_midi = motor_midi
-        self.motor_audio = motor_audio
-        self.modo_asignacion_activo = False
-        self._ruta_proyecto: Optional[str] = None
+        self.project = project
+        self.midi_engine = midi_engine
+        self.audio_engine = audio_engine
+        self.assignment_mode_active = False
+        self._project_path: Optional[str] = None
 
         self.setWindowTitle("Launchpad Mini MK2 Sampler")
         self.resize(720, 520)
-        self._construir_ui()
-        self._construir_menu()
-        self._conectar_midi()
-        self._actualizar_grid_banco()
+        self._build_ui()
+        self._build_menu()
+        self._connect_midi()
+        self._update_grid_bank()
 
     # ── Construcción de UI ──────────────────────────────────────────────
 
-    def _construir_ui(self) -> None:
+    def _build_ui(self) -> None:
         central = QWidget()
         self.setCentralWidget(central)
-        layout_principal = QVBoxLayout(central)
-        layout_principal.setSpacing(4)
-        layout_principal.setContentsMargins(8, 8, 8, 4)
+        main_layout = QVBoxLayout(central)
+        main_layout.setSpacing(4)
+        main_layout.setContentsMargins(8, 8, 8, 4)
 
         # Fila superior: bancos + botón modo asignación
-        fila_bancos = QHBoxLayout()
-        nombres = [b.nombre for b in self.proyecto.bancos]
-        self.selector_bancos = SelectorBancos(nombres=nombres)
-        self.selector_bancos.banco_cambiado.connect(self.on_banco_cambiado)
-        fila_bancos.addWidget(self.selector_bancos, 1)
+        bank_row = QHBoxLayout()
+        names = [b.name for b in self.project.banks]
+        self.bank_selector = BankSelector(names=names)
+        self.bank_selector.bank_changed.connect(self.on_bank_changed)
+        bank_row.addWidget(self.bank_selector, 1)
 
-        self.btn_modo_asignacion = QToolButton()
-        self.btn_modo_asignacion.setText("⚡ Modo Asignación")
-        self.btn_modo_asignacion.setCheckable(True)
-        self.btn_modo_asignacion.clicked.connect(self.toggle_modo_asignacion)
-        fila_bancos.addWidget(self.btn_modo_asignacion)
-        layout_principal.addLayout(fila_bancos)
+        self.btn_assignment_mode = QToolButton()
+        self.btn_assignment_mode.setText("⚡ Modo Asignación")
+        self.btn_assignment_mode.setCheckable(True)
+        self.btn_assignment_mode.clicked.connect(self.toggle_assignment_mode)
+        bank_row.addWidget(self.btn_assignment_mode)
+        main_layout.addLayout(bank_row)
 
         # Área central: grid + panel derecho
-        area_central = QHBoxLayout()
-        self.grid = GridPads(colores_paleta=COLORES_LP)
-        self.grid.pad_seleccionado.connect(self.on_pad_click_ui)
-        area_central.addWidget(self.grid, 1)
+        center_area = QHBoxLayout()
+        self.grid = PadGrid(color_palette=LP_COLORS)
+        self.grid.pad_selected.connect(self.on_pad_click_ui)
+        center_area.addWidget(self.grid, 1)
 
         # Panel derecho apilado: config pad / ajustes
         self.stack_panel = QStackedWidget()
         self.stack_panel.setMinimumWidth(200)
         self.stack_panel.setMaximumWidth(240)
 
-        self.panel_config = PanelConfigPad()
-        self.panel_config.color_cambiado.connect(self.on_color_cambiado)
-        self.panel_config.audio_cambiado.connect(self.on_audio_cambiado)
-        self.stack_panel.addWidget(self.panel_config)  # índice 0
+        self.config_panel = PadConfigPanel()
+        self.config_panel.color_changed.connect(self.on_color_changed)
+        self.config_panel.audio_changed.connect(self.on_audio_changed)
+        self.stack_panel.addWidget(self.config_panel)  # índice 0
 
-        dispositivos_midi = listar_dispositivos_midi()
-        dispositivos_audio = [d["name"] for d in sd.query_devices()
-                              if d.get("max_output_channels", 0) > 0]
-        self.panel_ajustes = PanelAjustes(
-            ajustes=self.proyecto.ajustes,
-            dispositivos_midi=dispositivos_midi,
-            dispositivos_audio=dispositivos_audio,
+        midi_devices = list_midi_devices()
+        audio_devices = [d["name"] for d in sd.query_devices()
+                         if d.get("max_output_channels", 0) > 0]
+        self.settings_panel = SettingsPanel(
+            settings=self.project.settings,
+            midi_devices=midi_devices,
+            audio_devices=audio_devices,
         )
-        self.panel_ajustes.ajustes_cambiados.connect(self.on_ajustes_cambiados)
-        self.stack_panel.addWidget(self.panel_ajustes)  # índice 1
+        self.settings_panel.settings_changed.connect(self.on_settings_changed)
+        self.stack_panel.addWidget(self.settings_panel)  # índice 1
 
-        area_central.addWidget(self.stack_panel)
-        layout_principal.addLayout(area_central, 1)
+        center_area.addWidget(self.stack_panel)
+        main_layout.addLayout(center_area, 1)
 
         # Barra de estado
-        self.label_estado = QLabel("● Sin conexión")
-        self.statusBar().addWidget(self.label_estado, 1)
+        self.label_status = QLabel("● Sin conexión")
+        self.statusBar().addWidget(self.label_status, 1)
 
-        self.slider_volumen = QSlider(Qt.Orientation.Horizontal)
-        self.slider_volumen.setRange(0, 100)
-        self.slider_volumen.setValue(int(self.proyecto.ajustes.volumen * 100))
-        self.slider_volumen.setMaximumWidth(100)
-        self.slider_volumen.valueChanged.connect(self._on_volumen_slider)
+        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(int(self.project.settings.volume * 100))
+        self.volume_slider.setMaximumWidth(100)
+        self.volume_slider.valueChanged.connect(self._on_volume_slider)
         self.statusBar().addPermanentWidget(QLabel("Vol:"))
-        self.statusBar().addPermanentWidget(self.slider_volumen)
+        self.statusBar().addPermanentWidget(self.volume_slider)
 
-    def _construir_menu(self) -> None:
+    def _build_menu(self) -> None:
         mb = self.menuBar()
 
-        m_archivo = mb.addMenu("Archivo")
-        m_archivo.addAction("Nuevo", self.nuevo_proyecto)
-        m_archivo.addAction("Abrir...", self.abrir_proyecto)
-        m_archivo.addAction("Guardar", self.guardar_proyecto)
-        m_archivo.addAction("Guardar como...", self.guardar_proyecto_como)
-        m_archivo.addSeparator()
-        m_archivo.addAction("Salir", self.close)
+        m_file = mb.addMenu("Archivo")
+        m_file.addAction("Nuevo", self.new_project)
+        m_file.addAction("Abrir...", self.open_project)
+        m_file.addAction("Guardar", self.save_project)
+        m_file.addAction("Guardar como...", self.save_project_as)
+        m_file.addSeparator()
+        m_file.addAction("Salir", self.close)
 
         m_config = mb.addMenu("Configuración")
-        m_config.addAction("Ajustes", self.mostrar_ajustes)
+        m_config.addAction("Ajustes", self.show_settings)
 
-        m_ayuda = mb.addMenu("Ayuda")
-        m_ayuda.addAction("Acerca de", self.mostrar_acerca_de)
+        m_help = mb.addMenu("Ayuda")
+        m_help.addAction("Acerca de", self.show_about)
 
     # ── MIDI ────────────────────────────────────────────────────────────
 
-    def _conectar_midi(self) -> None:
-        self.motor_midi.set_callback_pad(self.on_pad_fisico)
-        self.motor_midi.set_callback_escena(self.on_banco_cambiado)
-        if self.motor_midi.conectar():
-            self.label_estado.setText("● Launchpad conectado")
-            self.motor_midi.actualizar_leds_banco(
-                self.proyecto.banco_activo,
-                self.proyecto.banco_activo_indice,
-                self.proyecto.bancos,
+    def _connect_midi(self) -> None:
+        self.midi_engine.set_callback_pad(self.on_physical_pad)
+        self.midi_engine.set_callback_scene(self.on_bank_changed)
+        if self.midi_engine.connect():
+            self.label_status.setText("● Launchpad conectado")
+            self.midi_engine.update_bank_leds(
+                self.project.active_bank,
+                self.project.active_bank_index,
+                self.project.banks,
             )
         else:
-            self.label_estado.setText("● Sin conexión — abrí Configuración > Ajustes")
-            self.mostrar_ajustes()
+            self.label_status.setText("● Sin conexión — abrí Configuración > Ajustes")
+            self.show_settings()
 
-    def on_pad_fisico(self, pad_id: int) -> None:
+    def on_physical_pad(self, pad_id: int) -> None:
         """Llamado desde hilo MIDI cuando se presiona un pad físico."""
-        if self.modo_asignacion_activo:
-            config_actual = self.proyecto.banco_activo.pads.get(pad_id)
-            dialogo = DialogoConfigPad(pad_id=pad_id, config_actual=config_actual, parent=self)
-            if dialogo.exec():
-                nueva_config = dialogo.obtener_config()
-                if nueva_config:
-                    self.proyecto.banco_activo.pads[pad_id] = nueva_config
-                    self.motor_midi.set_color_pad(pad_id, nueva_config.color)
-                    fila, col = nota_a_pad(pad_id)
-                    self.grid.set_color_pad(fila, col, nueva_config.color)
+        if self.assignment_mode_active:
+            current_config = self.project.active_bank.pads.get(pad_id)
+            dialog = PadConfigDialog(pad_id=pad_id, current_config=current_config, parent=self)
+            if dialog.exec():
+                new_config = dialog.get_config()
+                if new_config:
+                    self.project.active_bank.pads[pad_id] = new_config
+                    self.midi_engine.set_pad_color(pad_id, new_config.color)
+                    row, col = note_to_pad(pad_id)
+                    self.grid.set_pad_color(row, col, new_config.color)
         else:
-            config = self.proyecto.banco_activo.pads.get(pad_id)
+            config = self.project.active_bank.pads.get(pad_id)
             if config and os.path.exists(config.audio_file):
-                self.motor_midi.iniciar_parpadeo(pad_id, config.color)
-                self.motor_audio.reproducir(
+                self.midi_engine.start_blink(pad_id, config.color)
+                self.audio_engine.play(
                     config.audio_file,
-                    volumen=self.proyecto.ajustes.volumen,
-                    modo=self.proyecto.ajustes.modo_reproduccion,
+                    volume=self.project.settings.volume,
+                    mode=self.project.settings.play_mode,
                     pad_id=pad_id,
-                    al_terminar=lambda pid: self.motor_midi.detener_parpadeo(
-                        pid, self.proyecto.banco_activo.pads.get(pid, PadConfig("", 0)).color
+                    on_complete=lambda pid: self.midi_engine.stop_blink(
+                        pid, self.project.active_bank.pads.get(pid, PadConfig("", 0)).color
                     ),
                 )
 
-    def on_pad_click_ui(self, fila: int, col: int) -> None:
+    def on_pad_click_ui(self, row: int, col: int) -> None:
         """Selección desde la UI (click en grid)."""
-        pad_id = pad_a_nota(fila, col)
-        config = self.proyecto.banco_activo.pads.get(pad_id)
-        self.panel_config.mostrar_pad(pad_id, config)
+        pad_id = pad_to_note(row, col)
+        config = self.project.active_bank.pads.get(pad_id)
+        self.config_panel.show_pad(pad_id, config)
         self.stack_panel.setCurrentIndex(0)
 
-    def on_color_cambiado(self, pad_id: int, color: int) -> None:
-        config = self.proyecto.banco_activo.pads.get(pad_id)
+    def on_color_changed(self, pad_id: int, color: int) -> None:
+        config = self.project.active_bank.pads.get(pad_id)
         if config:
             config.color = color
         else:
-            self.proyecto.banco_activo.pads[pad_id] = PadConfig(audio_file="", color=color)
-        fila, col = nota_a_pad(pad_id)
-        self.grid.set_color_pad(fila, col, color)
-        self.motor_midi.set_color_pad(pad_id, color)
+            self.project.active_bank.pads[pad_id] = PadConfig(audio_file="", color=color)
+        row, col = note_to_pad(pad_id)
+        self.grid.set_pad_color(row, col, color)
+        self.midi_engine.set_pad_color(pad_id, color)
 
-    def on_audio_cambiado(self, pad_id: int, ruta: str) -> None:
-        config = self.proyecto.banco_activo.pads.get(pad_id)
+    def on_audio_changed(self, pad_id: int, path: str) -> None:
+        config = self.project.active_bank.pads.get(pad_id)
         if config:
-            config.audio_file = ruta
+            config.audio_file = path
         else:
-            self.proyecto.banco_activo.pads[pad_id] = PadConfig(audio_file=ruta, color=0)
+            self.project.active_bank.pads[pad_id] = PadConfig(audio_file=path, color=0)
 
-    def on_banco_cambiado(self, indice: int) -> None:
-        if indice < 0 or indice >= len(self.proyecto.bancos):
+    def on_bank_changed(self, index: int) -> None:
+        if index < 0 or index >= len(self.project.banks):
             return
-        self.proyecto.banco_activo_indice = indice
-        self.selector_bancos.setCurrentIndex(indice)
-        self._actualizar_grid_banco()
-        self.motor_midi.actualizar_leds_banco(
-            self.proyecto.banco_activo, indice, self.proyecto.bancos
+        self.project.active_bank_index = index
+        self.bank_selector.setCurrentIndex(index)
+        self._update_grid_bank()
+        self.midi_engine.update_bank_leds(
+            self.project.active_bank, index, self.project.banks
         )
 
-    def on_ajustes_cambiados(self, ajustes) -> None:
-        self.proyecto.ajustes = ajustes
-        self.slider_volumen.setValue(int(ajustes.volumen * 100))
+    def on_settings_changed(self, settings) -> None:
+        self.project.settings = settings
+        self.volume_slider.setValue(int(settings.volume * 100))
 
-    def toggle_modo_asignacion(self) -> None:
-        self.modo_asignacion_activo = not self.modo_asignacion_activo
-        self.btn_modo_asignacion.setChecked(self.modo_asignacion_activo)
+    def toggle_assignment_mode(self) -> None:
+        self.assignment_mode_active = not self.assignment_mode_active
+        self.btn_assignment_mode.setChecked(self.assignment_mode_active)
 
-    def mostrar_ajustes(self) -> None:
+    def show_settings(self) -> None:
         self.stack_panel.setCurrentIndex(1)
 
-    def mostrar_acerca_de(self) -> None:
-        dialogo = DialogoAcercaDe(
-            dispositivo_conectado=self.motor_midi.nombre_dispositivo,
+    def show_about(self) -> None:
+        dialog = AboutDialog(
+            connected_device=self.midi_engine.device_name,
             parent=self,
         )
-        dialogo.exec()
+        dialog.exec()
 
     # ── Archivo ─────────────────────────────────────────────────────────
 
-    def nuevo_proyecto(self) -> None:
-        self.proyecto = Proyecto.nuevo()
-        self._ruta_proyecto = None
-        self._actualizar_grid_banco()
+    def new_project(self) -> None:
+        self.project = Project.new()
+        self._project_path = None
+        self._update_grid_bank()
 
-    def abrir_proyecto(self) -> None:
-        from config.archivo_proyecto import cargar_proyecto
-        ruta, _ = QFileDialog.getOpenFileName(self, "Abrir proyecto", "", FILTRO_PROYECTO)
-        if ruta:
+    def open_project(self) -> None:
+        from config.project_file import load_project
+        path, _ = QFileDialog.getOpenFileName(self, "Abrir proyecto", "", PROJECT_FILTER)
+        if path:
             try:
-                self.proyecto = cargar_proyecto(ruta)
-                self._ruta_proyecto = ruta
-                self._actualizar_grid_banco()
-                self.motor_midi.actualizar_leds_banco(
-                    self.proyecto.banco_activo,
-                    self.proyecto.banco_activo_indice,
-                    self.proyecto.bancos,
+                self.project = load_project(path)
+                self._project_path = path
+                self._update_grid_bank()
+                self.midi_engine.update_bank_leds(
+                    self.project.active_bank,
+                    self.project.active_bank_index,
+                    self.project.banks,
                 )
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"No se pudo abrir el proyecto:\n{e}")
 
-    def guardar_proyecto(self) -> None:
-        if self._ruta_proyecto:
-            self._guardar_en(self._ruta_proyecto)
+    def save_project(self) -> None:
+        if self._project_path:
+            self._save_to(self._project_path)
         else:
-            self.guardar_proyecto_como()
+            self.save_project_as()
 
-    def guardar_proyecto_como(self) -> None:
-        ruta, _ = QFileDialog.getSaveFileName(self, "Guardar proyecto", "", FILTRO_PROYECTO)
-        if ruta:
-            if not ruta.endswith(".lpsampler"):
-                ruta += ".lpsampler"
-            self._guardar_en(ruta)
+    def save_project_as(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(self, "Guardar proyecto", "", PROJECT_FILTER)
+        if path:
+            if not path.endswith(".lpsampler"):
+                path += ".lpsampler"
+            self._save_to(path)
 
-    def _guardar_en(self, ruta: str) -> None:
-        from config.archivo_proyecto import guardar_proyecto
+    def _save_to(self, path: str) -> None:
+        from config.project_file import save_project
         try:
-            guardar_proyecto(self.proyecto, ruta)
-            self._ruta_proyecto = ruta
+            save_project(self.project, path)
+            self._project_path = path
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No se pudo guardar:\n{e}")
 
     # ── Helpers ─────────────────────────────────────────────────────────
 
-    def _actualizar_grid_banco(self) -> None:
-        banco = self.proyecto.banco_activo
-        for fila in range(8):
+    def _update_grid_bank(self) -> None:
+        bank = self.project.active_bank
+        for row in range(8):
             for col in range(8):
-                nota = pad_a_nota(fila, col)
-                config = banco.pads.get(nota)
+                note = pad_to_note(row, col)
+                config = bank.pads.get(note)
                 color = config.color if config else 0
-                self.grid.set_color_pad(fila, col, color)
+                self.grid.set_pad_color(row, col, color)
 
-    def _on_volumen_slider(self, valor: int) -> None:
-        self.proyecto.ajustes.volumen = valor / 100.0
+    def _on_volume_slider(self, value: int) -> None:
+        self.project.settings.volume = value / 100.0
 
     def closeEvent(self, event) -> None:
-        self.motor_audio.detener_todo()
-        self.motor_midi.desconectar()
+        self.audio_engine.stop_all()
+        self.midi_engine.disconnect()
         super().closeEvent(event)
 ```
 
 - [ ] **Paso 4: Ejecutar test (debe pasar)**
 
 ```bash
-pytest tests/test_ventana_principal.py -v
+pytest tests/test_main_window.py -v
 ```
 
 Esperado: 5 tests PASSED
@@ -2197,8 +2197,8 @@ Esperado: todos los tests PASSED
 - [ ] **Paso 6: Commit**
 
 ```bash
-git add ui/ventana_principal.py tests/test_ventana_principal.py
-git commit -S -m "feat: ventana principal — orquesta grid, bancos, MIDI y audio"
+git add ui/main_window.py tests/test_main_window.py
+git commit -S -m "feat: main window — orchestrates grid, banks, MIDI and audio"
 ```
 
 ---
@@ -2213,10 +2213,10 @@ git commit -S -m "feat: ventana principal — orquesta grid, bancos, MIDI y audi
 ```python
 import sys
 from PyQt6.QtWidgets import QApplication
-from motor.motor_midi import MotorMidi
-from motor.motor_audio import MotorAudio
-from modelos.proyecto import Proyecto
-from ui.ventana_principal import VentanaPrincipal
+from engine.midi_engine import MidiEngine
+from engine.audio_engine import AudioEngine
+from models.project import Project
+from ui.main_window import MainWindow
 
 
 def main() -> None:
@@ -2224,16 +2224,16 @@ def main() -> None:
     app.setApplicationName("Launchpad Mini MK2 Sampler")
     app.setOrganizationName("mfernandezfunes")
 
-    proyecto = Proyecto.nuevo()
-    motor_midi = MotorMidi()
-    motor_audio = MotorAudio()
+    project = Project.new()
+    midi_engine = MidiEngine()
+    audio_engine = AudioEngine()
 
-    ventana = VentanaPrincipal(
-        proyecto=proyecto,
-        motor_midi=motor_midi,
-        motor_audio=motor_audio,
+    window = MainWindow(
+        project=project,
+        midi_engine=midi_engine,
+        audio_engine=audio_engine,
     )
-    ventana.show()
+    window.show()
     sys.exit(app.exec())
 
 
@@ -2253,7 +2253,7 @@ Esperado: ventana abre, muestra "Sin conexión" en barra de estado, panel de aju
 
 ```bash
 git add main.py
-git commit -S -m "feat: punto de entrada — app lista para ejecutar"
+git commit -S -m "feat: entry point — app ready to run"
 ```
 
 ---
@@ -2307,7 +2307,7 @@ Verificar que la ventana abre correctamente.
 
 ```bash
 git add launchpad-sampler.spec
-git commit -S -m "build: configuración PyInstaller para .exe y .app"
+git commit -S -m "build: PyInstaller config for .exe and .app"
 ```
 
 ---
@@ -2334,19 +2334,19 @@ git push -u origin main
 
 | Requisito del spec | Tarea |
 |---|---|
-| Grid 8×8 con colores | Tarea 7 |
-| Bancos A–H con tabs | Tarea 8 |
+| Grid 8x8 con colores | Tarea 7 |
+| Bancos A-H con tabs | Tarea 8 |
 | Paleta 64 colores LP Mini MK2 | Tarea 9 |
 | Panel config pad (color + audio) | Tarea 10 |
-| Modo Asignación → diálogo config | Tarea 11 |
+| Modo Asignación -> dialogo config | Tarea 11 |
 | Acerca de (Martin Fernandez Funes) | Tarea 12 |
 | Panel ajustes (MIDI, audio, modo, vol) | Tarea 13 |
 | Ventana principal + orquestación | Tarea 14 |
-| Botones de escena → cambio de banco | Tarea 5 + 14 |
+| Botones de escena -> cambio de banco | Tarea 5 + 14 |
 | Banco activo titila en LP | Tarea 5 |
 | Pads titilan mientras reproducen | Tarea 5 + 14 |
 | Audio standalone (sounddevice) | Tarea 4 |
-| Modos única / bucle / alternar | Tarea 4 |
+| Modos oneshot / loop / toggle | Tarea 4 |
 | Save/Load .lpsampler | Tarea 3 |
 | Reconexión automática | Tarea 14 |
 | README con imagen del dispositivo | Tarea 1 |
