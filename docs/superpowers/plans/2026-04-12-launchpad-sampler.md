@@ -86,7 +86,7 @@ dev = [
 ]
 
 [build-system]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 requires = ["setuptools>=68"]
 
 [tool.pytest.ini_options]
