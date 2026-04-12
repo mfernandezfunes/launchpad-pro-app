@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 
 a = Analysis(
     ['main.py'],
@@ -34,11 +35,13 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='assets/icon.ico' if sys.platform == 'win32' else None,
 )
 
-app = BUNDLE(
-    exe,
-    name='Launchpad Sampler.app',
-    icon='assets/icon.icns',
-    bundle_identifier='com.mfernandezfunes.launchpad-sampler',
-)
+if sys.platform == 'darwin':
+    app = BUNDLE(
+        exe,
+        name='Launchpad Sampler.app',
+        icon='assets/icon.icns',
+        bundle_identifier='com.mfernandezfunes.launchpad-sampler',
+    )

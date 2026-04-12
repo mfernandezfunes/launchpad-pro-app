@@ -37,7 +37,7 @@ def test_toggle_assignment_mode(window):
     assert window.assignment_mode_active is False
 
 
-def test_change_bank_updates_grid(window):
-    window.project.banks.append(Bank(name="B"))
-    window.on_bank_changed(1)
+def test_add_bank_and_switch(window):
+    window._on_add_bank()
+    assert len(window.project.banks) == 2
     assert window.project.active_bank_index == 1

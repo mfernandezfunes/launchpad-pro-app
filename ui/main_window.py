@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
         names = [b.name for b in self.project.banks]
         self.bank_selector = BankSelector(names=names)
         self.bank_selector.bank_changed.connect(self.on_bank_changed)
+        self.bank_selector.add_bank_requested.connect(self._on_add_bank)
         bank_row.addWidget(self.bank_selector, 1)
 
         self.btn_assignment_mode = QToolButton()
@@ -202,6 +203,16 @@ class MainWindow(QMainWindow):
         self.midi_engine.update_bank_leds(
             self.project.active_bank, index, self.project.banks
         )
+
+    def _on_add_bank(self) -> None:
+        from ui.bank_selector import BANK_NAMES, MAX_BANKS
+        count = len(self.project.banks)
+        if count >= MAX_BANKS:
+            return
+        name = BANK_NAMES[count]
+        self.project.banks.append(Bank(name=name))
+        self.bank_selector.add_bank(name)
+        self.on_bank_changed(count)
 
     def on_settings_changed(self, settings) -> None:
         self.project.settings = settings

@@ -8,12 +8,12 @@ def selector(qapp):
 
 
 def test_shows_initial_banks(selector):
-    assert selector.count() == 3
+    assert selector.count() == 4  # 3 banks + "+"
 
 
 def test_add_bank(selector):
     selector.add_bank("D")
-    assert selector.count() == 4
+    assert selector.count() == 5  # 4 banks + "+"
 
 
 def test_bank_change_emits_signal(selector, qtbot):

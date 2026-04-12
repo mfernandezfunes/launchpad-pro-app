@@ -18,16 +18,19 @@ def main() -> None:
     # Singleton: si ya hay una instancia, activarla y salir
     socket = QLocalSocket()
     socket.connectToServer(APP_KEY)
-    if socket.waitForConnected(500):
+    if socket.waitForConnected(200):
         socket.write(QByteArray(b"activate"))
         socket.flush()
-        socket.waitForBytesWritten(1000)
+        if socket.waitForBytesWritten(500):
+            socket.disconnectFromServer()
+            app.quit()
+            return
         socket.disconnectFromServer()
-        sys.exit(0)
 
     server = QLocalServer()
     QLocalServer.removeServer(APP_KEY)
-    server.listen(APP_KEY)
+    if not server.listen(APP_KEY):
+        return
 
     project = Project.new()
     midi_engine = MidiEngine()
