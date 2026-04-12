@@ -20,7 +20,7 @@ build-backend = "setuptools.build_meta"
 requires = ["setuptools>=68"]
 
 [tool.setuptools.packages.find]
-include = ["modelos*", "motor*", "ui*", "config*"]
+include = ["models*", "engine*", "ui*", "config*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
