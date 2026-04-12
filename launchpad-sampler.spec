@@ -39,5 +39,6 @@ exe = EXE(
 app = BUNDLE(
     exe,
     name='Launchpad Sampler.app',
+    icon='assets/icon.icns',
     bundle_identifier='com.mfernandezfunes.launchpad-sampler',
 )
