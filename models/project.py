@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 @dataclass
 class PadConfig:
     audio_file: str
-    color: int  # MIDI velocity 1-63, 0 = off
+    color: int  # MIDI velocity 0-127 (índice en paleta LP MK2)
 
 
 @dataclass

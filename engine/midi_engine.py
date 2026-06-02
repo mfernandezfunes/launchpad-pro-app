@@ -11,6 +11,12 @@ logger = logging.getLogger(__name__)
 # Notas de escena: CC 104-111 (fila superior del LP Mini MK2)
 SCENE_NOTES = list(range(104, 112))
 
+# SysEx para Launchpad Mini MK2 (device ID 0x18)
+SYSEX_HEADER_MK2 = [0x00, 0x20, 0x29, 0x02, 0x18]
+LAYOUT_SESSION = 0x00
+LAYOUT_DRUM_RACK = 0x01
+LAYOUT_USER = 0x03
+
 
 def pad_to_note(row: int, col: int) -> int:
     """Convierte posición visual del grid (row 0=arriba) a nota MIDI."""
@@ -58,16 +64,39 @@ class MidiEngine:
         self._midi_out.open_port(idx_out)
         self._midi_in.set_callback(self._on_message)
         self._connected = True
+        self._init_device()
         logger.info("Launchpad conectado: %s", ports_in[idx_in])
         return True
 
+    def _init_device(self) -> None:
+        """Inicializa el Launchpad: layout Session y flush de buffer."""
+        self._midi_out.send_message(
+            [0xF0] + SYSEX_HEADER_MK2 + [0x22, LAYOUT_SESSION, 0xF7]
+        )
+        self._flush_buttons()
+
+    def _flush_buttons(self) -> None:
+        """Limpia el buffer de eventos pendientes del Launchpad."""
+        for _ in range(64):
+            msg = self._midi_in.get_message()
+            if msg is None:
+                break
+
     def disconnect(self) -> None:
         self.stop_all_blinks()
+        if self._connected:
+            self._reset_device()
         if self._midi_in.is_port_open():
             self._midi_in.close_port()
         if self._midi_out.is_port_open():
             self._midi_out.close_port()
         self._connected = False
+
+    def _reset_device(self) -> None:
+        """Apaga todos los LEDs al desconectar."""
+        self._midi_out.send_message(
+            [0xF0] + SYSEX_HEADER_MK2 + [0x0E, 0x00, 0xF7]
+        )
 
     def set_callback_pad(self, callback: Callable[[int], None]) -> None:
         """callback(pad_id: int) llamado al presionar un pad del grid."""
@@ -140,7 +169,7 @@ class MidiEngine:
         channel = status & 0x0F
         msg_type = status & 0xF0
         if msg_type == 0x90 and channel == 0:  # note_on canal 1
-            if 11 <= note <= 88 and note % 10 != 9:  # pad del grid
+            if 11 <= note <= 88 and 1 <= (note % 10) <= 8:  # pad del grid
                 if self._callback_pad:
                     self._callback_pad(note)
         elif msg_type == 0xB0:  # control change (botones de escena)
