@@ -103,6 +103,9 @@ class MainWindow(QMainWindow):
         self.label_status = QLabel("● Sin conexión")
         self.statusBar().addWidget(self.label_status, 1)
 
+        self.label_note = QLabel("")
+        self.statusBar().addPermanentWidget(self.label_note)
+
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(int(self.project.settings.volume * 100))
@@ -144,8 +147,13 @@ class MainWindow(QMainWindow):
             self.label_status.setText("● Sin conexión — abrí Configuración > Ajustes")
             self.show_settings()
 
+    def _show_note(self, pad_id: int) -> None:
+        row, col = note_to_pad(pad_id)
+        self.label_note.setText(f"Nota: {pad_id}  (R{row+1} C{col+1})")
+
     def on_physical_pad(self, pad_id: int) -> None:
         """Llamado desde hilo MIDI cuando se presiona un pad físico."""
+        self._show_note(pad_id)
         if self.assignment_mode_active:
             current_config = self.project.active_bank.pads.get(pad_id)
             dialog = PadConfigDialog(pad_id=pad_id, current_config=current_config, parent=self)
@@ -173,6 +181,7 @@ class MainWindow(QMainWindow):
     def on_pad_click_ui(self, row: int, col: int) -> None:
         """Selección desde la UI (click en grid)."""
         pad_id = pad_to_note(row, col)
+        self._show_note(pad_id)
         config = self.project.active_bank.pads.get(pad_id)
         self.config_panel.show_pad(pad_id, config)
         self.stack_panel.setCurrentIndex(0)
