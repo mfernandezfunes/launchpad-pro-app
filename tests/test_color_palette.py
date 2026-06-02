@@ -1,18 +1,18 @@
 import pytest
-from ui.color_palette import ColorPalette, LP_COLORS
+from ui.color_palette import ColorPalette, LP_COLORS, CURATED_COLORS
 
 
-def test_palette_has_64_entries():
-    assert len(LP_COLORS) == 64
+def test_palette_has_128_entries():
+    assert len(LP_COLORS) == 128
 
 
 def test_color_0_is_black():
     assert LP_COLORS[0].lower() == "#000000"
 
 
-def test_palette_widget_creates_64_buttons(qapp):
+def test_palette_widget_creates_curated_buttons(qapp):
     palette = ColorPalette()
-    assert len(palette.buttons) == 64
+    assert len(palette.buttons) == len(CURATED_COLORS)
 
 
 def test_click_color_emits_signal(qapp, qtbot):

@@ -2,7 +2,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 
 class AboutDialog(QDialog):
